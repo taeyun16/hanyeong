@@ -2,7 +2,7 @@
 //!
 //! 바꾸기 전의 값은 우리 설정 도메인에 남긴다(`kept.rs`). 되돌릴 때는 지금 값이 우리가 써 넣은
 //! 값일 때만 되돌린다. 무엇을 쓸지는 `hanyeong_core::shortcut` 의 `claim`·`release` 가 정하고, 여기서는 그
-//! 순서대로 쓰기만 한다. 쓰기의 순서는 `formal/models/Shortcut60.tla` 가 본뜬 것이다.
+//! 순서대로 쓰기만 한다. 쓰기의 순서는 `hanyeong-core/tests/shortcut60_replay.rs` 가 옮겨 적어 시험한다.
 
 use core::fmt;
 use core::ptr;

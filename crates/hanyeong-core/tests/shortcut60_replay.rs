@@ -1,12 +1,10 @@
-//! `formal/models/Shortcut60.tla` 의 길을 실제 판단 함수(`shortcut::claim`, `shortcut::release`)로
-//! 한 걸음씩 다시 걷는다.
+//! 단축키 60번을 바꾸고 되돌리는 순서를, 강제 종료와 남의 쓰기를 섞어 실제 판단 함수
+//! (`shortcut::claim`, `shortcut::release`)로 한 걸음씩 걷는다. 걸음마다 지켜야 할 규칙을 확인한다.
 //!
-//! 걸음의 이름은 모델의 동작 이름과 같고, 걸음마다 모델의 규칙을 확인한다. 설정을 쓰는 순서(기록
-//! 다음에 60번, 60번 다음에 지우기)는 `crates/hanyeong-mac/src/hotkey.rs` 의 것을 옮겨 적었다. 그
-//! 파일이 바뀌면 `formal/check.py` 가 다시 맞춰 보라고 멈춘다.
+//! 설정을 쓰는 순서(기록 다음에 60번, 60번 다음에 지우기)는 `crates/hanyeong-mac/src/hotkey.rs` 의 것을
+//! 옮겨 적었다. 그 파일의 쓰는 순서를 바꾸면 여기 걸음도 같이 고친다.
 //!
-//! `finding_` 으로 시작하는 테스트는 2026-11-17 에 모델이 찾아 고친 길이다(`formal/README.md`).
-//! `formal/check.py --replay` 는 고친 곳을 하나씩 되돌려 이 테스트들이 실패하는지 확인한다.
+//! `finding_` 으로 시작하는 테스트는 2026-11-17 에 찾아 고친 길이다. 고친 곳을 되돌리면 실패한다.
 
 use hanyeong_core::shortcut::{self, Claim, Entry, NO_CHARACTER, Release, Written};
 
@@ -30,7 +28,7 @@ const fn ours(key_code: i64) -> Entry {
     entry([NO_CHARACTER, key_code, 0])
 }
 
-/// 모델의 변수들. 60번, 우리 설정 도메인의 기록(써 넣은 키들과 원래 값), 그리고 유령 변수.
+/// 걸음마다 보는 상태. 60번, 우리 설정 도메인의 기록(써 넣은 키들과 원래 값), 그리고 유령 변수.
 struct Machine {
     sys: Option<Entry>,
     written: Written,
@@ -63,7 +61,7 @@ impl Machine {
         }
     }
 
-    /// 모델의 규칙들.
+    /// 지켜야 할 규칙들.
     fn check(&self) {
         if !self.by_us {
             assert_eq!(
@@ -198,7 +196,7 @@ fn a_value_someone_set_while_we_ran_is_left_alone() {
     assert!(machine.written.is_empty());
 }
 
-// 발견 1. 모델의 길: Start, ClaimRead, 기록을 남김, Crash, OtherWrites, Start, ClaimRead, 기록을
+// 발견 1. 길: Start, ClaimRead, 기록을 남김, Crash, OtherWrites, Start, ClaimRead, 기록을
 // 남김, ClaimWrite. 고치기 전에는 남아 있던 표시를 믿고 낡은 원래 값을 그대로 두었다.
 #[test]
 fn finding_1_a_choice_made_after_a_crash_is_what_gets_restored() {
@@ -212,7 +210,7 @@ fn finding_1_a_choice_made_after_a_crash_is_what_gets_restored() {
     assert_eq!(machine.sys, Some(CUSTOM));
 }
 
-// 발견 2. 모델의 길: Start(f19), ..., ClaimWrite, Crash, StartRestore(f18), ReleaseRead. 고치기 전에는
+// 발견 2. 길: Start(f19), ..., ClaimWrite, Crash, StartRestore(f18), ReleaseRead. 고치기 전에는
 // 60번이 이번 --target 과 달라 "남이 바꿨다"고 보고 원래 값을 버렸다.
 #[test]
 fn finding_2_a_key_written_by_an_earlier_run_is_still_ours() {

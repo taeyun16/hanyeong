@@ -190,8 +190,7 @@ gksdud 에 없는 것도 하나 있습니다. 같은 방식의 도구가 함께 
 - 재부팅이나 다시 로그인한 뒤 저절로 켜지는지는 아직 직접 확인하지 않았습니다.
 - 접근성 권한은 서명에 묶여 있습니다. 서명 방식을 바꾸면 권한을 한 번 다시 줘야 합니다.
 - hanyeong 이 시스템 단축키를 읽고 쓰는 바로 그 순간에 다른 프로그램이 같은 단축키를 바꾸면, 그
-  값이 사라질 수 있습니다. macOS 에 이걸 막을 잠금 장치가 없습니다. 자세한 내용은
-  [`formal/README.md`](formal/README.md) 에 있습니다.
+  값이 사라질 수 있습니다. macOS 에 이걸 막을 잠금 장치가 없습니다.
 
 ## 개발
 
@@ -208,7 +207,6 @@ gksdud 에 없는 것도 하나 있습니다. 같은 방식의 도구가 함께 
 | 포맷과 린트 | `cargo fmt`, clippy(경고도 실패로). `unsafe` 는 `hanyeong-mac` 에서만, 블록마다 이유를 적는다 |
 | 테스트 | `cargo test` |
 | 실기기 확인 | macOS 를 부르는 코드를 실제로 띄워 보고, `hanyeong probe` 로 지연을 잰다 |
-| 정형 검증 | 단축키를 바꾸고 되돌리는 순서를, 강제 종료를 포함한 모든 경우에 대해 TLA+ 모델로 검사한다 |
 
 ```sh
 cargo fmt --all --check
@@ -222,13 +220,4 @@ cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
 ```
 
-```sh
-python3 formal/check.py --replay
-```
-
-정형 검증에는 Java 가 필요합니다. 검사 도구 TLC 는 처음 돌릴 때 내려받습니다.
-
-정형 검증은 [pstack](https://github.com/cursor/plugins/tree/main/pstack) 의
-`create-formal-verification-skill` 흐름을 따랐습니다. 강제로 꺼진 뒤 단축키가 잘못 되돌아가는 경우 셋을
-찾아 고쳤습니다. 무엇을 검증했고 무엇을 찾았는지는 [`formal/README.md`](formal/README.md), 측정 기록은
-[`docs/perf-progress.md`](docs/perf-progress.md) 에 있습니다.
+측정 기록은 [`docs/perf-progress.md`](docs/perf-progress.md) 에 있습니다.

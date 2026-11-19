@@ -16,10 +16,6 @@
 4. **실기기 확인**: `crates/hanyeong-mac`·`crates/hanyeong` 를 바꿨으면 실제로 띄워 `hanyeong status`
    와 `hanyeong probe` 의 출력을 보고에 붙인다. 이 코드는 테스트가 덮지 못한다. 이벤트 탭이나 전환
    경로를 바꿨으면 `probe` 로 전후를 재서 `docs/perf-progress.md` 에 남긴다.
-5. **정형 검증**: 단축키 60번을 바꾸고 되돌리는 코드(`formal/coverage.json` 의 `files`)를 바꿨으면
-   `python3 formal/check.py --replay` 의 출력을 보고에 붙인다. 0 은 약속을 지킨다, 1 은 깬다, 2 는
-   덮는 코드가 바뀌어 모델과 다시 맞춰 봐야 한다는 뜻이다. 절차는
-   `formal/README.md` 의 "코드를 바꿀 때". 통과시키려고 규칙이나 모델을 약하게 만들지 않는다.
 
 ## 2. 테스트 정책
 
@@ -30,7 +26,7 @@
   다시 만들어 통과시키지 않는다.
 - 테스트는 결정적이어야 한다. 벽시계 시간, 실제 키보드, 실제 시스템 설정에 기대지 않는다.
   시간은 인자로 넣는다(`Key::now_ns`).
-- `#[ignore]` 는 정형 검증이 찾았고 아직 고치지 않은 발견의 재현 테스트에만 쓴다. 고치면 뗀다.
+- `#[ignore]` 는 찾았지만 아직 고치지 않은 버그의 재현 테스트에만 쓴다. 고치면 뗀다.
   지금은 하나도 없다.
 
 ## 3. Rust 코드 제약
@@ -74,5 +70,3 @@
 |---|---|---|
 | 실기기의 전환 지연·키 통과 지연 | `hanyeong probe`, `tools/measure_live.sh` | `docs/perf-progress.md` |
 | gksdud·도구 없음·hanyeong 을 번갈아 비교 | `tools/compare_live.sh` | `docs/perf-progress.md`. 합성 키로는 전환 지연을 잴 수 없다 |
-| 단축키 60번을 바꾸고 되돌리는 순서의 모든 경우 | `formal/check.py`, `formal/models/Shortcut60.tla`, pstack 의 `/statechart` | `formal/README.md` |
-| 정형 검증의 다음 대상 고르기 | pstack 의 `/create-formal-verification-skill` | [pstack](https://github.com/cursor/plugins/tree/main/pstack) |

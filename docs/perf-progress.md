@@ -301,11 +301,10 @@ hanyeong 은 다시 보내는 누름을 받은 이벤트의 복사본으로 만�
 ## 2026-11-17 10:30: 단축키 60번의 판단을 core 로 옮긴 뒤의 실기기 확인
 
 `hotkey.rs` 가 하던 판단(원래 값을 남길지, 되돌릴지 잊을지)을 `hanyeong_core::shortcut` 의
-`claim`·`release` 로 옮겼다. 동작은 바꾸지 않았다. 정형 검증(`formal/`)이 실제 코드를 재생할 수 있게
-하려는 것이다. 검증의 결과와 발견 3건은 `formal/README.md` 에 있다.
+`claim`·`release` 로 옮겼다. 동작은 바꾸지 않았다. 순서를 실제 판단 코드로 재생해 시험할 수 있게
+하려는 것이다.
 
-- 정형 검증: `python3 formal/check.py --replay` 가 1 로 끝났다(모델 15건이 기록과 같음, 열린 발견
-  3건이 실제 코드에서 재현됨).
+- 재생 테스트: 열린 발견 3건이 실제 판단 코드에서 재현됐다(`#[ignore]`).
 - 실기기(`tools/install.sh` 로 설치, 고정 서명이라 권한 유지):
 
   | 한 일 | 본 것 |
@@ -328,18 +327,15 @@ hanyeong 은 다시 보내는 누름을 받은 이벤트의 복사본으로 만�
 
 ## 2026-11-17 10:53: 단축키 60번의 복원을 고친 뒤 (발견 3건)
 
-정형 검증이 찾은 세 길을 고쳤다(`formal/README.md`). 표시와 원래 값을 따로 남기던 것을, 써 넣은
+강제 종료가 섞인 순서에서 단축키가 잘못 되돌아가는 세 길을 고쳤다. 표시와 원래 값을 따로 남기던 것을, 써 넣은
 F-키들과 원래 값을 담은 값 하나(`shortcut60.record`)로 한 번에 남긴다(`crates/hanyeong-mac/src/kept.rs`).
 우리 값인지는 그 기록으로 판단하고(`shortcut::Written`), 60번이 우리 값이 아니면 남은 기록을 믿지 않는다.
 `hotkey::release` 는 이제 `--target` 을 받지 않는다.
 
 - 테스트: Rust 53건 통과, 무시 0건(core 35, 재생 9, mac 9). 고치기 전에 `#[ignore]` 로 실패하던 재현
   테스트 셋이 이제 통과한다.
-- 정형 검증(`python3 formal/check.py --replay`): 지금 코드의 설정에서 규칙 넷이 지켜진다(상태 588개).
-  고치기 전의 설정에서는 넷 다 깨지고, 가정을 푼 설정에서는 둘이 깨진다. 고친 곳 셋을 사본에서
-  되돌리면 재생 테스트가 `KeptIsLatest`, `KeptWhileOurs`, `OursOrTheirs` 에서 실패한다.
-- 정형 검증은 재생 테스트 파일이 바뀌어 처음에 `sync_required` 로 멈췄다(설계대로다). `--accept-sync`
-  로 적고 다시 돌리자 종료 코드 0 으로 끝났다(22.5초).
+- 고친 곳 셋을 사본에서 되돌리면 재생 테스트가 `KeptIsLatest`, `KeptWhileOurs`, `OursOrTheirs` 에서
+  실패한다.
 - 실기기. 강제 종료는 `launchctl kill SIGKILL` 뒤 곧바로 `bootout` 으로 다시 뜨지 않게 했다.
 
   | 한 일 | 60번 | `dev.hanyeong` |

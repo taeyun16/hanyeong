@@ -1,5 +1,5 @@
 //! 시스템 단축키 60번(`이전 입력 소스 선택`)이 우리 F-키로 맞춰져 있는지, 바꾸고 되돌릴 때 무엇을
-//! 쓸지 판단한다. 쓰는 순서의 모든 경우는 `formal/models/Shortcut60.tla` 가 검사한다.
+//! 쓸지 판단한다. 강제 종료를 섞은 순서는 `tests/shortcut60_replay.rs` 가 걷는다.
 
 use crate::keys::TargetKey;
 
