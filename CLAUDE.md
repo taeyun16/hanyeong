@@ -77,7 +77,7 @@
   clippy·테스트를 Linux 에서, `install.sh`·`tools/*.sh` 를 shellcheck 로 돌린다. 실기기 확인은 CI 가
   대신하지 못한다.
 - `.github/workflows/release.yml`: `v*` 태그(= `Cargo.toml` 의 버전)를 올리면 universal 실행 파일을
-  Releases 에 올리고, `HOMEBREW_TAP_TOKEN` 이 있으면 `taeyun16/homebrew-tap` 의 formula 를 바꾼 뒤
+  Releases 에 올리고, `HOMEBREW_TAP_DEPLOY_KEY`(tap 에 쓰기로 등록한 배포 키)가 있으면 `taeyun16/homebrew-tap` 의 formula 를 바꾼 뒤
   `brew install` 로 확인한다. formula 의 원본은 `packaging/homebrew/hanyeong.rb`.
 - 설치는 어느 경로든 실행 파일 하나를 받고 `hanyeong install` 이 번들과 LaunchAgent 를 만든다
   (`crates/hanyeong/src/install.rs`, 내용은 `hanyeong_core::install`). 설치 경로를 더할 때도 이 명령을 쓴다.
