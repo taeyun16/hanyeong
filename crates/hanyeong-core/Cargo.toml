@@ -1,6 +1,6 @@
 [package]
 name = "hanyeong-core"
-description = "한영 전환의 판단 로직. 시스템 호출이 없어 어느 OS 에서나 시험된다"
+description = "한영 전환의 판단 로직. 시스템을 부르지 않아 테스트로 확인된다"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

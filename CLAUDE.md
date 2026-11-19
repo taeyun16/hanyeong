@@ -42,7 +42,7 @@
 - **상한**: 새 컬렉션에는 상한 상수를 둔다(`MAX_MAPPINGS`, `MAX_KEYBOARDS`).
 - **의존성**: 외부 크레이트 0 개로 시작했다. 더하려면 이유와 빌드 시간·바이너리 크기 영향을 적는다.
 - **린트 끄기**: `#[expect(lint, reason = "…")]` 를 가장 작은 항목에만 붙인다.
-- **macOS 전용**이다. `hanyeong-core` 는 어느 OS 에서나 빌드·시험된다.
+- **macOS 전용**이다. 그래도 `hanyeong-core` 에는 macOS 를 부르는 코드를 넣지 않는다.
 
 ## 4. 사용자의 시스템을 바꾸는 코드
 
@@ -73,9 +73,9 @@
 
 ## 7. CI 와 배포
 
-- `.github/workflows/ci.yml`: 풀 리퀘스트와 `main` 마다 1절의 1·2 를 macOS 에서, `Cargo.toml` 의
-  `rust-version`(Homebrew 가 쓰는 Rust 가 이보다 낮으면 설치가 깨진다)으로 빌드·테스트를 macOS 에서, `hanyeong-core` 의
-  clippy·테스트를 Linux 에서, `install.sh`·`tools/*.sh` 를 shellcheck 로 돌린다. 실기기 확인은 CI 가
+- `.github/workflows/ci.yml`: 풀 리퀘스트와 `main` 마다 macOS 에서 1절의 1·2 를, `Cargo.toml` 의
+  `rust-version` 으로 빌드·테스트를(Homebrew 가 쓰는 Rust 가 이보다 낮으면 설치가 깨진다), 그리고
+  `install.sh`·`tools/*.sh` 의 shellcheck 를 돌린다. 세 잡 모두 `main` 의 필수 검사다. 실기기 확인은 CI 가
   대신하지 못한다.
 - `.github/workflows/release.yml`: `v*` 태그(= `Cargo.toml` 의 버전)를 올리면 universal 실행 파일을
   Releases 에 올리고, `HOMEBREW_TAP_DEPLOY_KEY`(tap 에 쓰기로 등록한 배포 키)가 있으면 `taeyun16/homebrew-tap` 의 formula 를 바꾼 뒤

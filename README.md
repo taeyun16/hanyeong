@@ -218,7 +218,7 @@ gksdud 에 없는 것도 하나 있습니다. 같은 방식의 도구가 함께 
 
 | 폴더 | 내용 |
 |---|---|
-| `crates/hanyeong-core` | 무엇을 할지 정하는 로직. 시스템을 부르지 않아 어느 OS 에서나 테스트됩니다 |
+| `crates/hanyeong-core` | 무엇을 할지 정하는 로직. 시스템을 부르지 않아 테스트로 확인할 수 있습니다 |
 | `crates/hanyeong-mac` | macOS 를 부르는 코드(이벤트 탭, 키보드 설정, 단축키, 메뉴바). `unsafe` 는 여기에만 있습니다 |
 | `crates/hanyeong` | 실행 파일 |
 
@@ -228,13 +228,13 @@ gksdud 에 없는 것도 하나 있습니다. 같은 방식의 도구가 함께 
 cargo build --release --locked -p hanyeong && ./target/release/hanyeong install
 ```
 
-모든 변경은 아래 검사를 거칩니다. 풀 리퀘스트를 열면 앞의 둘은 CI(GitHub Actions)가 macOS 와 Linux 에서
+모든 변경은 아래 검사를 거칩니다. 풀 리퀘스트를 열면 앞의 둘은 CI(GitHub Actions)가 macOS 에서
 돌립니다. 기여 방법은 [`CONTRIBUTING.md`](CONTRIBUTING.md), 자세한 규칙은 [`CLAUDE.md`](CLAUDE.md) 에 있습니다.
 
 | 검사 | 보는 것 |
 |---|---|
 | 포맷과 린트 | `cargo fmt`, clippy(경고도 실패로). `unsafe` 는 `hanyeong-mac` 에서만, 블록마다 이유를 적는다 |
-| 테스트 | `cargo test`. `hanyeong-core` 는 Linux 에서도 돌린다 |
+| 테스트 | `cargo test`. CI 는 지원하는 가장 낮은 Rust(`rust-version`)로도 돌린다 |
 | 실기기 확인 | macOS 를 부르는 코드를 실제로 띄워 보고, `hanyeong probe` 로 지연을 잰다. CI 가 대신하지 못한다 |
 
 ```sh
