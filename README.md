@@ -31,42 +31,48 @@ macOS 전용입니다. Apple Silicon Mac, macOS 27.2 에서 만들고 확인했�
 
 ## 설치
 
-**준비물**
-
-- Xcode 명령행 도구: 없으면 `xcode-select --install`
-- [Rust](https://rustup.rs): 필요한 버전(1.100.0)은 저장소에 적혀 있어서 rustup 이 알아서 받습니다
-
 > gksdud 를 쓰고 있었다면 먼저 종료하고 로그인 항목에서 빼 주세요. 둘이 함께 돌면 서로의 키를
 > 주고받기 때문에, hanyeong 은 gksdud 가 켜져 있으면 시작하지 않습니다.
 
-**1. 내려받기**
+아래 셋 중 하나로 실행 파일을 받은 뒤 `hanyeong install` 을 한 번 실행합니다.
+
+**Homebrew**
 
 ```sh
-git clone https://github.com/taeyun16/hanyeong.git
+brew install taeyun16/tap/hanyeong
 ```
 
 ```sh
-cd hanyeong
+hanyeong install
 ```
 
-**2. 서명 인증서 만들기** (처음 한 번만)
+Homebrew 가 이 Mac 에서 소스로 빌드합니다. 빌드에 필요한 Rust 도 함께 설치합니다.
+
+**설치 스크립트**
 
 ```sh
-tools/setup_signing.sh --create
+curl -fsSL https://raw.githubusercontent.com/taeyun16/hanyeong/main/install.sh | sh
 ```
 
-이 Mac 의 로그인 키체인에 hanyeong 전용 서명 인증서를 만듭니다. 이게 있어야 나중에 새 버전을 설치해도
-접근성 권한이 그대로 남습니다. 건너뛰면 설치할 때마다 권한을 다시 줘야 합니다.
+[GitHub Releases](https://github.com/taeyun16/hanyeong/releases) 에서 Apple Silicon·Intel 겸용 실행 파일을
+받아 체크섬을 확인하고, `~/.local/bin` 에 둔 뒤 `hanyeong install` 까지 실행합니다. 관리자 권한은 쓰지
+않습니다. 브라우저로 직접 받은 파일은 macOS 가 실행을 막으니 이 스크립트를 쓰세요.
 
-**3. 설치하기**
+**Cargo** (Rust 1.100 이상)
 
 ```sh
-tools/install.sh
+cargo install --locked --git https://github.com/taeyun16/hanyeong hanyeong
 ```
 
-빌드해서 `~/Applications/hanyeong.app` 에 넣고, 로그인할 때 저절로 켜지도록 등록한 뒤 바로 켭니다.
+```sh
+hanyeong install
+```
 
-**4. 접근성 권한 주기**
+`hanyeong install` 은 `~/Applications/hanyeong.app` 을 만들고, 로그인할 때 저절로 켜지도록 등록한 뒤 바로
+켭니다. 다른 키를 쓰려면 `hanyeong install --key right-option` 처럼 고릅니다. **새 버전을 받은 뒤에도
+`hanyeong install` 을 다시 실행해야** 앱에 반영됩니다.
+
+**접근성 권한 주기**
 
 처음 켜면 `시스템 설정 › 개인정보 보호 및 보안 › 손쉬운 사용` 화면이 열립니다. 목록에서 **hanyeong**
 을 켜 주세요. 목록에 없으면 `+` 를 눌러 `~/Applications/hanyeong.app` 을 더합니다. 켜고 나면 10초 안에
@@ -76,6 +82,23 @@ tools/install.sh
 
 키 입력을 받아야 하는 도구라서 이 권한이 꼭 필요합니다. hanyeong 은 다른 키가 오면 어떤 키인지(키
 코드)만 보고 바로 흘려보냅니다. 입력한 내용을 저장하거나 어디로 보내지 않습니다.
+
+**권한 유지하기** (선택)
+
+접근성 권한은 앱의 서명에 묶입니다. 그냥 설치하면 새 버전을 설치할 때마다 권한을 다시 줘야 할 수
+있습니다. 이 Mac 에 hanyeong 전용 서명 인증서를 한 번 만들어 두면 `hanyeong install` 이 그것으로 서명해서,
+새 버전을 설치해도 권한이 그대로 남습니다.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/taeyun16/hanyeong/main/tools/setup_signing.sh | sh -s -- --create
+```
+
+```sh
+hanyeong install
+```
+
+인증서는 로그인 키체인에만 들어가고 시스템의 신뢰 설정은 바꾸지 않습니다. 서명 방식이 바뀌어 권한이 한
+번 풀리면 `tccutil reset Accessibility dev.hanyeong` 뒤 다시 켜 주세요.
 
 ## 쓰는 법
 
@@ -93,7 +116,7 @@ tools/install.sh
 ### 잘 켜져 있는지 확인하기
 
 ```sh
-~/Applications/hanyeong.app/Contents/MacOS/hanyeong status
+hanyeong status
 ```
 
 아무것도 바꾸지 않고 지금 상태만 보여 줍니다. 아래처럼 나오면 잘 동작하는 것입니다.
@@ -102,19 +125,17 @@ tools/install.sh
 
 ### 다른 키를 쓰고 싶다면
 
-터미널에서 직접 켤 수도 있습니다. 이때는 그 터미널 앱에 접근성 권한이 있어야 합니다.
+로그인 항목을 다른 키로 다시 등록합니다.
 
 ```sh
-cargo build --release --locked -p hanyeong
-```
-
-```sh
-./target/release/hanyeong run --key right-option
+hanyeong install --key right-option
 ```
 
 | 명령 | 하는 일 |
 |---|---|
-| `run` | 켭니다. Ctrl+C 로 끄면 되돌립니다 |
+| `install` | 앱을 만들고 로그인할 때 켜지게 등록한 뒤 켭니다 |
+| `uninstall` | 끄고(설정을 되돌립니다) 로그인 항목과 앱을 지웁니다 |
+| `run` | 이 터미널에서 켭니다. Ctrl+C 로 끄면 되돌립니다. 그 터미널 앱에 접근성 권한이 있어야 합니다 |
 | `status` | 권한, 단축키, 키보드마다의 설정을 보여 줍니다 |
 | `restore` | 강제로 꺼진 뒤 남은 설정을 되돌립니다 |
 | `probe` | 실제 기기에서 전환이 얼마나 걸리는지 잽니다(개발용, 입력 소스가 실제로 바뀝니다) |
@@ -125,10 +146,11 @@ cargo build --release --locked -p hanyeong
 ### 지우기
 
 ```sh
-tools/install.sh uninstall
+hanyeong uninstall
 ```
 
-끄면서 바꿔 둔 설정을 되돌리고, 로그인 항목과 앱을 지웁니다.
+끄면서 바꿔 둔 설정을 되돌리고, 로그인 항목과 앱을 지웁니다. 그다음 실행 파일을 받은 방법대로
+지웁니다: `brew uninstall hanyeong`, `rm ~/.local/bin/hanyeong`, `cargo uninstall hanyeong`.
 
 ## 문제가 생기면
 
@@ -200,13 +222,20 @@ gksdud 에 없는 것도 하나 있습니다. 같은 방식의 도구가 함께 
 | `crates/hanyeong-mac` | macOS 를 부르는 코드(이벤트 탭, 키보드 설정, 단축키, 메뉴바). `unsafe` 는 여기에만 있습니다 |
 | `crates/hanyeong` | 실행 파일 |
 
-모든 변경은 아래 검사를 거칩니다. 규칙은 [`CLAUDE.md`](CLAUDE.md) 에 있습니다.
+소스에서 빌드해 설치하려면:
+
+```sh
+cargo build --release --locked -p hanyeong && ./target/release/hanyeong install
+```
+
+모든 변경은 아래 검사를 거칩니다. 풀 리퀘스트를 열면 앞의 둘은 CI(GitHub Actions)가 macOS 와 Linux 에서
+돌립니다. 기여 방법은 [`CONTRIBUTING.md`](CONTRIBUTING.md), 자세한 규칙은 [`CLAUDE.md`](CLAUDE.md) 에 있습니다.
 
 | 검사 | 보는 것 |
 |---|---|
 | 포맷과 린트 | `cargo fmt`, clippy(경고도 실패로). `unsafe` 는 `hanyeong-mac` 에서만, 블록마다 이유를 적는다 |
-| 테스트 | `cargo test` |
-| 실기기 확인 | macOS 를 부르는 코드를 실제로 띄워 보고, `hanyeong probe` 로 지연을 잰다 |
+| 테스트 | `cargo test`. `hanyeong-core` 는 Linux 에서도 돌린다 |
+| 실기기 확인 | macOS 를 부르는 코드를 실제로 띄워 보고, `hanyeong probe` 로 지연을 잰다. CI 가 대신하지 못한다 |
 
 ```sh
 cargo fmt --all --check
@@ -221,3 +250,15 @@ cargo test --locked --workspace
 ```
 
 측정 기록은 [`docs/perf-progress.md`](docs/perf-progress.md) 에 있습니다.
+
+### 릴리스
+
+`Cargo.toml` 의 `version` 을 올려 커밋한 뒤, 같은 버전의 태그를 올립니다.
+
+```sh
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+[릴리스 워크플로](.github/workflows/release.yml)가 Apple Silicon·Intel 겸용 실행 파일을 만들어 GitHub
+Releases 에 올리고, `taeyun16/homebrew-tap` 의 formula 를 새 버전으로 바꾼 뒤 실제로 `brew install` 해
+봅니다. formula 의 원본은 [`packaging/homebrew/hanyeong.rb`](packaging/homebrew/hanyeong.rb) 입니다.

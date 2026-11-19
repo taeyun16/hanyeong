@@ -63,6 +63,10 @@ pub enum Command {
     Status(Keys),
     Restore(Keys),
     Probe(Probe),
+    /// 앱 번들을 만들고 로그인할 때 `run` 이 뜨게 한다.
+    Install(Keys),
+    /// `install` 이 만든 것을 멈추고 지운다.
+    Uninstall,
     Help,
     Version,
 }
@@ -111,14 +115,24 @@ pub fn parse<'a>(mut words: impl Iterator<Item = &'a str>) -> Result<Command, Ar
     };
     if !matches!(
         command,
-        "run" | "status" | "restore" | "probe" | "help" | "--help" | "-h" | "version" | "--version"
+        "run"
+            | "status"
+            | "restore"
+            | "probe"
+            | "install"
+            | "uninstall"
+            | "help"
+            | "--help"
+            | "-h"
+            | "version"
+            | "--version"
     ) {
         return Err(ArgError::UnknownCommand(command.into()));
     }
     while let Some(flag) = words.next() {
         let (name, slot): (&'static str, u8) = match (command, flag) {
-            ("run" | "status" | "restore", "--key") => ("--key", 0),
-            ("run" | "status" | "restore" | "probe", "--target") => ("--target", 1),
+            ("run" | "status" | "restore" | "install", "--key") => ("--key", 0),
+            ("run" | "status" | "restore" | "install" | "probe", "--target") => ("--target", 1),
             ("probe", "--mode") => ("--mode", 2),
             ("probe", "--count") => ("--count", 3),
             ("probe", "--hold-ms") => ("--hold-ms", 4),
@@ -144,6 +158,8 @@ pub fn parse<'a>(mut words: impl Iterator<Item = &'a str>) -> Result<Command, Ar
         "status" => Command::Status(keys),
         "restore" => Command::Restore(keys),
         "probe" => Command::Probe(probe),
+        "install" => Command::Install(keys),
+        "uninstall" => Command::Uninstall,
         "version" | "--version" => Command::Version,
         _ => Command::Help,
     })
@@ -181,6 +197,23 @@ mod tests {
         assert_eq!(
             read("restore --key caps-lock --target f18"),
             Ok(Command::Restore(keys))
+        );
+    }
+
+    #[test]
+    fn install_takes_the_keys_the_login_item_will_run_with() {
+        assert_eq!(read("install"), Ok(Command::Install(Keys::default())));
+        assert_eq!(
+            read("install --key right-option --target f17"),
+            Ok(Command::Install(Keys {
+                source: SourceKey::RightOption,
+                target: TargetKey::F17,
+            }))
+        );
+        assert_eq!(read("uninstall"), Ok(Command::Uninstall));
+        assert_eq!(
+            read("uninstall --key caps-lock"),
+            Err(ArgError::UnknownFlag("--key".into()))
         );
     }
 

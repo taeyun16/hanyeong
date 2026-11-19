@@ -70,3 +70,15 @@
 |---|---|---|
 | 실기기의 전환 지연·키 통과 지연 | `hanyeong probe`, `tools/measure_live.sh` | `docs/perf-progress.md` |
 | gksdud·도구 없음·hanyeong 을 번갈아 비교 | `tools/compare_live.sh` | `docs/perf-progress.md`. 합성 키로는 전환 지연을 잴 수 없다 |
+
+## 7. CI 와 배포
+
+- `.github/workflows/ci.yml`: 풀 리퀘스트와 `main` 마다 1절의 1·2 를 macOS 에서, `hanyeong-core` 의
+  clippy·테스트를 Linux 에서, `install.sh`·`tools/*.sh` 를 shellcheck 로 돌린다. 실기기 확인은 CI 가
+  대신하지 못한다.
+- `.github/workflows/release.yml`: `v*` 태그(= `Cargo.toml` 의 버전)를 올리면 universal 실행 파일을
+  Releases 에 올리고, `HOMEBREW_TAP_TOKEN` 이 있으면 `taeyun16/homebrew-tap` 의 formula 를 바꾼 뒤
+  `brew install` 로 확인한다. formula 의 원본은 `packaging/homebrew/hanyeong.rb`.
+- 설치는 어느 경로든 실행 파일 하나를 받고 `hanyeong install` 이 번들과 LaunchAgent 를 만든다
+  (`crates/hanyeong/src/install.rs`, 내용은 `hanyeong_core::install`). 설치 경로를 더할 때도 이 명령을 쓴다.
+- 워크플로의 액션은 커밋 해시로 고정한다. 올리는 것은 dependabot 이 한다.

@@ -1,0 +1,122 @@
+name: Release
+
+# v 로 시작하는 태그를 올리면 돈다. 태그는 Cargo.toml 의 버전과 같아야 한다(예: 0.2.0 → v0.2.0).
+#   1. universal(arm64 + x86_64) 실행 파일을 만들어 GitHub Release 에 올린다(install.sh 가 받는 것).
+#   2. HOMEBREW_TAP_TOKEN 이 있으면 taeyun16/homebrew-tap 의 formula 를 새 버전으로 바꾼다.
+#   3. 바뀐 formula 를 실제로 brew 로 설치하고 시험한다.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  ASSET: hanyeong-universal-apple-darwin.tar.gz
+  TAP_REPO: taeyun16/homebrew-tap
+
+jobs:
+  build:
+    name: Build and publish the release
+    runs-on: macos-26
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: The tag must match Cargo.toml
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::태그 $GITHUB_REF_NAME 와 Cargo.toml 의 버전 $version 이 다릅니다"
+            exit 1
+          fi
+      - name: Install the pinned toolchain and both targets
+        run: |
+          rustup toolchain install
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - name: Test
+        run: cargo test --locked --workspace
+      - name: Build a universal binary
+        run: |
+          cargo build --release --locked -p hanyeong --target aarch64-apple-darwin
+          cargo build --release --locked -p hanyeong --target x86_64-apple-darwin
+          mkdir dist
+          lipo -create -output dist/hanyeong \
+            target/aarch64-apple-darwin/release/hanyeong \
+            target/x86_64-apple-darwin/release/hanyeong
+          codesign --force --sign - dist/hanyeong
+          lipo -info dist/hanyeong
+          dist/hanyeong version
+          cp LICENSE README.md dist/
+          tar -czf "$ASSET" -C dist hanyeong LICENSE README.md
+          shasum -a 256 "$ASSET" > "$ASSET.sha256"
+          cat "$ASSET.sha256"
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes \
+            --title "hanyeong $GITHUB_REF_NAME" "$ASSET" "$ASSET.sha256"
+
+  tap:
+    name: Update the Homebrew formula
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      pushed: ${{ steps.push.outputs.pushed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: push
+        name: Render and push Formula/hanyeong.rb
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "::notice::HOMEBREW_TAP_TOKEN 이 없어 Homebrew formula 를 건너뜁니다"
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          version=${GITHUB_REF_NAME#v}
+          sha=$(curl -fsSL "https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$GITHUB_REF_NAME.tar.gz" \
+            | shasum -a 256 | cut -d ' ' -f 1)
+          git clone --depth 1 "https://x-access-token:$TAP_TOKEN@github.com/$TAP_REPO.git" tap
+          mkdir -p tap/Formula
+          sed -e '1,2d' -e "s/@VERSION@/$version/g" -e "s/@SHA256@/$sha/g" \
+            packaging/homebrew/hanyeong.rb > tap/Formula/hanyeong.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/hanyeong.rb
+          if git diff --cached --quiet; then
+            echo "formula 가 이미 $version 입니다"
+          else
+            git commit -m "hanyeong $version"
+            git push origin HEAD
+          fi
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
+  verify-formula:
+    name: Install the formula with Homebrew
+    needs: tap
+    if: needs.tap.outputs.pushed == 'true'
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      HOMEBREW_NO_INSTALL_CLEANUP: "1"
+    steps:
+      - name: brew install, test, audit
+        run: |
+          tap=${TAP_REPO/homebrew-/}
+          brew tap "$tap"
+          brew install --build-from-source "$tap/hanyeong"
+          brew test "$tap/hanyeong"
+          brew audit --strict --online "$tap/hanyeong"
+          hanyeong version
