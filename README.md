@@ -72,6 +72,8 @@ tools/install.sh
 을 켜 주세요. 목록에 없으면 `+` 를 눌러 `~/Applications/hanyeong.app` 을 더합니다. 켜고 나면 10초 안에
 메뉴바에 `한` 이 나타납니다.
 
+<p align="center"><img src="docs/images/accessibility.png" width="472" alt="손쉬운 사용 목록에서 hanyeong 이 켜져 있는 모습"></p>
+
 키 입력을 받아야 하는 도구라서 이 권한이 꼭 필요합니다. hanyeong 은 다른 키가 오면 어떤 키인지(키
 코드)만 보고 바로 흘려보냅니다. 입력한 내용을 저장하거나 어디로 보내지 않습니다.
 
@@ -79,7 +81,9 @@ tools/install.sh
 
 **오른쪽 ⌘ 을 누르면 바뀝니다.** 그게 전부입니다.
 
-메뉴바의 `한` 을 누르면 메뉴가 나옵니다.
+켜져 있으면 메뉴바에 `한` 이 보입니다. 누르면 메뉴가 나옵니다.
+
+<p align="center"><img src="docs/images/menubar.png" width="54" alt="메뉴바의 한 아이콘"></p>
 
 | 메뉴 | 하는 일 |
 |---|---|
