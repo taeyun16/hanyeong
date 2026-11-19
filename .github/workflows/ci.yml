@@ -38,6 +38,25 @@ jobs:
           ./target/release/hanyeong version
           ls -l target/release/hanyeong
 
+  msrv:
+    name: macOS · MSRV
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install the rust-version from Cargo.toml
+        run: |
+          msrv=$(sed -n 's/^rust-version = "\(.*\)"$/\1/p' Cargo.toml)
+          echo "MSRV=$msrv" >> "$GITHUB_ENV"
+          rustup toolchain install "$msrv" --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: msrv
+      - name: Build and test with the oldest supported Rust
+        run: |
+          cargo "+$MSRV" build --locked --workspace --all-targets
+          cargo "+$MSRV" test --locked --workspace
+
   core:
     name: Linux · hanyeong-core
     runs-on: ubuntu-24.04

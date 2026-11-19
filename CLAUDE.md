@@ -73,7 +73,8 @@
 
 ## 7. CI 와 배포
 
-- `.github/workflows/ci.yml`: 풀 리퀘스트와 `main` 마다 1절의 1·2 를 macOS 에서, `hanyeong-core` 의
+- `.github/workflows/ci.yml`: 풀 리퀘스트와 `main` 마다 1절의 1·2 를 macOS 에서, `Cargo.toml` 의
+  `rust-version`(Homebrew 가 쓰는 Rust 가 이보다 낮으면 설치가 깨진다)으로 빌드·테스트를 macOS 에서, `hanyeong-core` 의
   clippy·테스트를 Linux 에서, `install.sh`·`tools/*.sh` 를 shellcheck 로 돌린다. 실기기 확인은 CI 가
   대신하지 못한다.
 - `.github/workflows/release.yml`: `v*` 태그(= `Cargo.toml` 의 버전)를 올리면 universal 실행 파일을

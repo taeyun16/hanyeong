@@ -58,7 +58,7 @@ curl -fsSL https://raw.githubusercontent.com/taeyun16/hanyeong/main/install.sh |
 받아 체크섬을 확인하고, `~/.local/bin` 에 둔 뒤 `hanyeong install` 까지 실행합니다. 관리자 권한은 쓰지
 않습니다. 브라우저로 직접 받은 파일은 macOS 가 실행을 막으니 이 스크립트를 쓰세요.
 
-**Cargo** (Rust 1.100 이상)
+**Cargo** (Rust 1.88 이상)
 
 ```sh
 cargo install --locked --git https://github.com/taeyun16/hanyeong hanyeong
