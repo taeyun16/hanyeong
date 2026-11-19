@@ -250,15 +250,3 @@ cargo test --locked --workspace
 ```
 
 측정 기록은 [`docs/perf-progress.md`](docs/perf-progress.md) 에 있습니다.
-
-### 릴리스
-
-`Cargo.toml` 의 `version` 을 올려 커밋한 뒤, 같은 버전의 태그를 올립니다.
-
-```sh
-git tag v0.2.0 && git push origin v0.2.0
-```
-
-[릴리스 워크플로](.github/workflows/release.yml)가 Apple Silicon·Intel 겸용 실행 파일을 만들어 GitHub
-Releases 에 올리고, `taeyun16/homebrew-tap` 의 formula 를 새 버전으로 바꾼 뒤 실제로 `brew install` 해
-봅니다. formula 의 원본은 [`packaging/homebrew/hanyeong.rb`](packaging/homebrew/hanyeong.rb) 입니다.
