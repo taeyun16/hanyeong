@@ -1,0 +1,11 @@
+[package]
+name = "hanyeong-mac"
+description = "macOS 호출: 이벤트 탭, HID 키 매핑, 시스템 단축키. 이 저장소에서 unsafe 가 있는 유일한 크레이트"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+hanyeong-core.workspace = true

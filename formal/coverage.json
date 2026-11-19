@@ -1,0 +1,137 @@
+{
+  "area": "shortcut60",
+  "property": "hanyeong 이 시스템 단축키 60번에 써 넣은 값은 덮어쓰기 직전의 값으로 되돌릴 수 있는 채로만 남는다. 그래서 60번에는 hanyeong 이 써 넣은 값 아니면 남이 정한 값만 있다.",
+  "harm": "한영 전환 단축키가 hanyeong 의 F-키에 묶인 채 남거나, 사용자가 고른 값이 옛 값이나 기본값으로 덮인다. hanyeong 을 지워도 그대로다.",
+  "tool": "TLA+ 와 TLC 1.7.4. 일이 나쁜 순서로 일어날 수 있는지를 묻는 질문이라 모델 검사기를 골랐다.",
+  "model": "Shortcut60.tla",
+  "files": {
+    "crates/hanyeong-core/src/shortcut.rs": "a3f1a18436d99ef3db0b1bc60e2085441cfee5f9e4608d2e4d6d55514c63842f",
+    "crates/hanyeong-mac/src/hotkey.rs": "b8de2c9e438e2b9bdcd5f0e0b840b74c8c79d61a8fe0ca4c085638177a86715d",
+    "crates/hanyeong-mac/src/kept.rs": "5b93570e584214bd3de999f71d39ee89bea3a244959dda7900bca538af49dee2",
+    "crates/hanyeong/src/app.rs": "48a7636cf707f26c113621f75bffa7402adc84c5af6f12bfd440c143b90697b1",
+    "crates/hanyeong/src/rivals.rs": "eadd21c9e511ee34544a061782e6366b97362b8b722f7167ab2f1981c88c7d9c",
+    "crates/hanyeong-core/tests/shortcut60_replay.rs": "05a6e0f563a6f99998206693bf0637203e7d471b15c58ccc7522135bb0f69b0f"
+  },
+  "functions": [
+    "hanyeong_core::shortcut::{owns, claim, release} 와 Written",
+    "hanyeong_mac::hotkey::{claim, release} 와 Names::{all, write}",
+    "hanyeong_mac::kept::Kept::{read, store, forget}",
+    "hanyeong::app::{run, undo, restore}",
+    "hanyeong::rivals::{rival, running}"
+  ],
+  "steps": {
+    "Start": "app::run 이 hotkey::claim 을 부른다",
+    "StartRestore": "app::restore 가 undo 를 거쳐 hotkey::release 를 부른다",
+    "ClaimRead": "hotkey::claim 의 Names::all, Kept::read, shortcut::claim",
+    "KeepRecord": "Kept::store: 써 넣은 키들과 원래 값을 담은 사전 하나를 CFPreferencesSetAppValue 한 번으로 쓴다",
+    "ClaimWrite": "Names::write(all, entry)",
+    "Quit": "session::run 이 끝난 뒤의 app::undo",
+    "ReleaseRead": "hotkey::release 의 Kept::read, Names::all, shortcut::release",
+    "Restore": "Names::write(all, record.original())",
+    "ForgetRecord": "Kept::forget",
+    "Crash": "SIGKILL, 전원 끊김, 패닉(release 프로필은 panic = abort)",
+    "OtherWrites": "시스템 설정의 키보드 단축키 화면, 또는 다른 도구",
+    "KeepFlag, KeepValue, ForgetFlag, ForgetValue": "고치기 전의 코드(Design = flag). 판단을 core 로 옮긴 직후의 hotkey.rs"
+  },
+  "atomicity": "설정 쓰기(CFPreferencesSetAppValue) 한 번이 동작 하나다. 한 번 부른 값은 뒤이은 호출이나 Synchronize 없이도 남는다(2026-11-17, macOS 27.2, 시험용 도메인에서 20번 중 20번). 읽기는 그 호출의 첫 쓰기와 한 걸음으로 묶지 않았다.",
+  "bounds": "F-키 둘(f19, f18), 남이 쓸 수 있는 값 셋(ctrl-space, custom, 항목 없음), 한 번에 프로세스 하나. 횟수 제한은 없다(상태가 유한하다).",
+  "assumptions": [
+    "hanyeong 프로세스는 한 번에 하나만 60번을 건드린다. rivals 의 확인에 기대며, 확인과 실행 사이의 틈은 보지 않았다.",
+    "claim·release 한 번이 도는 사이에는 남이 60번을 쓰지 않는다. 쓰면 어느 설계도 지키지 못한다(Shortcut60.midcall.cfg). macOS 에는 이것을 막을 잠금이 없다.",
+    "남은 hanyeong 의 F-키와 똑같은 값을 60번에 쓰지 않는다. gksdud 는 쓴다. 그 경우는 범위 밖이다."
+  ],
+  "left_out": [
+    "쓴 값을 살아 있는 단축키에 반영하는 activateSettings 의 성공과 실패.",
+    "60번 말고 다른 단축키: Names::write 는 읽어 둔 사전 전체를 다시 쓰므로, 그 사이에 남이 바꾼 다른 단축키를 되돌릴 수 있다.",
+    "키보드의 키 매핑(UserKeyMapping)을 걸고 되돌리는 순서.",
+    "설정 쓰기가 실패해 Err 로 돌아오는 경우. 그 자리에서 죽는 것과 같은 상태가 남는다고 보았다.",
+    "옛 형식(shortcut60.saved, shortcut60.original)의 기록을 읽고 지우는 걸음. Kept::store 는 새 기록을 쓴 뒤에, Kept::forget 은 새 기록을 지우기 전에 옛 값을 지운다. 재생 테스트 a_record_in_the_old_format_is_still_restored 가 판단만 확인한다."
+  ],
+  "checks": [
+    {
+      "config": "Shortcut60.cfg",
+      "what": "지금 코드",
+      "is_code": true,
+      "rules": {
+        "TypeOK": "holds",
+        "OursOrTheirs": "holds",
+        "KeptWhileOurs": "holds",
+        "FlagHasValue": "holds",
+        "KeptIsLatest": "holds"
+      }
+    },
+    {
+      "config": "Shortcut60.flag.cfg",
+      "what": "고치기 전의 코드. 검사가 실패할 수 있음을 보인다",
+      "is_code": false,
+      "rules": {
+        "TypeOK": "holds",
+        "OursOrTheirs": "breaks",
+        "KeptWhileOurs": "breaks",
+        "FlagHasValue": "breaks",
+        "KeptIsLatest": "breaks"
+      }
+    },
+    {
+      "config": "Shortcut60.midcall.cfg",
+      "what": "가정의 경계: 호출 도중에 남이 쓴다",
+      "is_code": false,
+      "rules": {
+        "TypeOK": "holds",
+        "OursOrTheirs": "breaks",
+        "KeptWhileOurs": "holds",
+        "FlagHasValue": "holds",
+        "KeptIsLatest": "breaks"
+      }
+    }
+  ],
+  "findings": [
+    {
+      "id": 1,
+      "rule": "KeptIsLatest",
+      "fixed": "2026-11-17",
+      "test": "finding_1_a_choice_made_after_a_crash_is_what_gets_restored",
+      "sentence": "강제 종료 뒤 사용자가 60번을 다시 고르고 hanyeong 을 다시 띄우면, 종료할 때 그 선택이 옛 값으로 덮였다.",
+      "fix": "60번이 우리가 써 넣은 값이 아니면 남아 있던 기록을 믿지 않고 지금 값을 새로 남긴다."
+    },
+    {
+      "id": 2,
+      "rule": "KeptWhileOurs",
+      "fixed": "2026-11-17",
+      "test": "finding_2_a_key_written_by_an_earlier_run_is_still_ours",
+      "sentence": "강제 종료 뒤 다른 --target 으로 restore 하면, 60번은 F-키에 묶인 채 남고 원래 값은 지워졌다.",
+      "fix": "우리 값인지를 이번 실행의 --target 이 아니라 기록에 적힌 F-키들로 판단한다."
+    },
+    {
+      "id": 3,
+      "rule": "FlagHasValue",
+      "fixed": "2026-11-17",
+      "test": "finding_3_a_crash_right_after_keeping_the_record_loses_nothing",
+      "sentence": "표시를 쓰고 원래 값을 쓰기 전에 죽으면, 다음 실행이 끝날 때 60번 항목을 지웠다.",
+      "fix": "써 넣은 키들과 원래 값을 한 값으로, 한 번의 쓰기로 남긴다."
+    }
+  ],
+  "mutations": [
+    {
+      "what": "남아 있는 기록을 60번과 견주지 않고 믿는다(발견 1 을 되돌린다)",
+      "file": "crates/hanyeong-core/src/shortcut.rs",
+      "before": "    } else if record.holds(current) {\n        Claim::Write {",
+      "after": "    } else if !record.is_empty() {\n        Claim::Write {",
+      "rule": "KeptIsLatest"
+    },
+    {
+      "what": "기록에 이번 F-키만 남기고 앞서 쓴 키를 잊는다(발견 2 를 되돌린다)",
+      "file": "crates/hanyeong-core/src/shortcut.rs",
+      "before": "            written: record.with(key_code),",
+      "after": "            written: Written::only(key_code),",
+      "rule": "KeptWhileOurs"
+    },
+    {
+      "what": "끝날 때 60번이 우리 값인지 보지 않고 되돌린다",
+      "file": "crates/hanyeong-core/src/shortcut.rs",
+      "before": "    } else if record.holds(current) {\n        Release::Restore",
+      "after": "    } else if !record.is_empty() {\n        Release::Restore",
+      "rule": "OursOrTheirs"
+    }
+  ]
+}

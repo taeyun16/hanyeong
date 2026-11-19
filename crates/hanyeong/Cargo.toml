@@ -1,0 +1,12 @@
+[package]
+name = "hanyeong"
+description = "누르는 순간 전환되는 Mac 한영 키. 메뉴바 아이콘 하나만 둔다"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+hanyeong-core.workspace = true
+hanyeong-mac.workspace = true

@@ -1,0 +1,6 @@
+# 모든 개발자·CI 가 같은 컴파일러를 쓴다. sccache 캐시도 버전별로 갈라지지 않는다.
+# 올릴 때는 mise.toml 의 rust 와 Cargo.toml 의 rust-version 도 함께 바꾼다.
+[toolchain]
+channel = "1.100.0"
+components = ["clippy", "rustfmt"]
+profile = "minimal"
