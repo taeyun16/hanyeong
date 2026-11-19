@@ -88,6 +88,8 @@ jobs:
           sha=$(curl -fsSL "https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$GITHUB_REF_NAME.tar.gz" \
             | shasum -a 256 | cut -d ' ' -f 1)
           git clone --depth 1 "https://x-access-token:$TAP_TOKEN@github.com/$TAP_REPO.git" tap
+          # 아직 커밋이 없는 빈 tap 이어도 main 에 올린다.
+          git -C tap switch -C main
           mkdir -p tap/Formula
           sed -e '1,2d' -e "s/@VERSION@/$version/g" -e "s/@SHA256@/$sha/g" \
             packaging/homebrew/hanyeong.rb > tap/Formula/hanyeong.rb
@@ -99,7 +101,7 @@ jobs:
             echo "formula 가 이미 $version 입니다"
           else
             git commit -m "hanyeong $version"
-            git push origin HEAD
+            git push origin main
           fi
           echo "pushed=true" >> "$GITHUB_OUTPUT"
 
