@@ -14,17 +14,17 @@ pub fn status(keys: Keys) -> bool {
         src: keys.source.usage(),
         dst: keys.target.usage(),
     };
-    println!("한영 키: {} → {}", keys.source.name(), keys.target.name());
-    println!(
+    out!("한영 키: {} → {}", keys.source.name(), keys.target.name());
+    out!(
         "접근성 권한: {}",
         if trust::trusted() { "있음" } else { "없음" }
     );
     for name in ["hanyeong", "gksdud"] {
-        println!("{name} 실행 중: {}", rivals::running(name));
+        out!("{name} 실행 중: {}", rivals::running(name));
     }
     let entry = hotkey::read();
     match &entry {
-        Some(entry) => println!(
+        Some(entry) => out!(
             "입력 소스 단축키(60): {:?}, 켜짐 {}, {}",
             entry.parameters,
             entry.enabled,
@@ -34,10 +34,10 @@ pub fn status(keys: Keys) -> bool {
                 "대상 F-키가 아님"
             }
         ),
-        None => println!("입력 소스 단축키(60): 읽을 수 없거나 없음"),
+        None => out!("입력 소스 단축키(60): 읽을 수 없거나 없음"),
     }
     let Some(keyboards) = Keyboards::open() else {
-        eprintln!("hanyeong: 키보드 목록을 읽지 못했습니다");
+        err!("hanyeong: 키보드 목록을 읽지 못했습니다");
         return false;
     };
     let (mut total, mut mapped) = (0_usize, 0_usize);
@@ -53,12 +53,12 @@ pub fn status(keys: Keys) -> bool {
             None => "읽을 수 없음",
         };
         total = total.saturating_add(1);
-        println!(
+        out!(
             "키보드 {:#x} {name}: 한영 키 매핑 {state}",
             keyboard.id().unwrap_or(0)
         );
     });
-    println!("키보드 {total} 대 가운데 {mapped} 대에 걸려 있음");
+    out!("키보드 {total} 대 가운데 {mapped} 대에 걸려 있음");
     true
 }
 
@@ -96,20 +96,20 @@ pub fn probe(probe: Probe) -> bool {
         ),
     };
     if !sent {
-        eprintln!(
+        err!(
             "hanyeong: 키 이벤트를 보내거나 받을 수 없습니다. 접근성 권한이 필요합니다(지금: {})",
             if trust::trusted() { "있음" } else { "없음" }
         );
         return false;
     }
     let Some(summary) = stats::summarize(&samples) else {
-        eprintln!(
+        err!(
             "hanyeong: {} 번 모두 시간 안에 결과가 없었습니다",
             samples.len()
         );
         return false;
     };
-    println!(
+    out!(
         "probe {label}: {}번 가운데 {}번 측정, {}번 놓침, hold {}ms, gap {}ms",
         samples.len(),
         summary.count,
@@ -117,7 +117,7 @@ pub fn probe(probe: Probe) -> bool {
         probe.hold_ms,
         probe.gap_ms
     );
-    println!(
+    out!(
         "  최소 {} ms, 중앙값 {} ms, p90 {} ms, 최대 {} ms",
         ms(summary.min),
         ms(summary.median),
@@ -132,6 +132,6 @@ pub fn probe(probe: Probe) -> bool {
             None => line.push('-'),
         }
     }
-    println!("{line}");
+    out!("{line}");
     true
 }

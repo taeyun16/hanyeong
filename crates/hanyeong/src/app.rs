@@ -39,7 +39,7 @@ impl App {
         };
         let Some(current) = keyboard.mappings() else {
             if Self::note(&mut self.refused, id) {
-                eprintln!("hanyeong: 키보드 {id:#x} 의 키 매핑을 읽을 수 없어 건너뜁니다");
+                err!("hanyeong: 키보드 {id:#x} 의 키 매핑을 읽을 수 없어 건너뜁니다");
             }
             return;
         };
@@ -47,19 +47,19 @@ impl App {
             Change::Keep => {}
             Change::TooMany => {
                 if Self::note(&mut self.refused, id) {
-                    eprintln!("hanyeong: 키보드 {id:#x} 의 키 매핑이 너무 많아 건너뜁니다");
+                    err!("hanyeong: 키보드 {id:#x} 의 키 매핑이 너무 많아 건너뜁니다");
                 }
             }
             Change::Write { list, displaced } => {
                 if !keyboard.set_mappings(&list) {
                     if Self::note(&mut self.refused, id) {
-                        eprintln!("hanyeong: 키보드 {id:#x} 가 키 매핑을 받지 않습니다");
+                        err!("hanyeong: 키보드 {id:#x} 가 키 매핑을 받지 않습니다");
                     }
                     return;
                 }
                 let mut name = String::new();
                 keyboard.push_name(&mut name);
-                println!("hanyeong: 한영 키를 걸었습니다: {name} ({id:#x})");
+                out!("hanyeong: 한영 키를 걸었습니다: {name} ({id:#x})");
                 if let Some(dst) = displaced
                     && self.displaced.len() < MAX_KEYBOARDS
                 {
@@ -73,7 +73,7 @@ impl App {
     fn apply_all(&mut self) {
         match Keyboards::open() {
             Some(keyboards) => keyboards.each(|keyboard| self.apply_to(keyboard)),
-            None => eprintln!("hanyeong: 키보드 목록을 읽지 못했습니다"),
+            None => err!("hanyeong: 키보드 목록을 읽지 못했습니다"),
         }
     }
 
@@ -81,7 +81,7 @@ impl App {
     fn remove_all(&self) -> usize {
         let mut removed = 0_usize;
         let Some(keyboards) = Keyboards::open() else {
-            eprintln!("hanyeong: 키보드 목록을 읽지 못해 키 매핑을 되돌리지 못했습니다");
+            err!("hanyeong: 키보드 목록을 읽지 못해 키 매핑을 되돌리지 못했습니다");
             return 0;
         };
         keyboards.each(|keyboard| {
@@ -97,7 +97,7 @@ impl App {
                 if keyboard.set_mappings(&list) {
                     removed = removed.saturating_add(1);
                 } else {
-                    eprintln!("hanyeong: 키보드 {id:#x} 의 키 매핑을 되돌리지 못했습니다");
+                    err!("hanyeong: 키보드 {id:#x} 의 키 매핑을 되돌리지 못했습니다");
                 }
             }
         });
@@ -131,15 +131,15 @@ fn new_app(keys: Keys) -> App {
 /// 걸어 둔 것을 되돌린다. 전부 되돌렸으면 참.
 fn undo(app: &App) -> bool {
     let removed = app.remove_all();
-    println!("hanyeong: 키보드 {removed} 대의 키 매핑을 되돌렸습니다");
+    out!("hanyeong: 키보드 {removed} 대의 키 매핑을 되돌렸습니다");
     match hotkey::release() {
-        Ok(Released::Restored) => println!("hanyeong: 입력 소스 단축키를 원래대로 되돌렸습니다"),
+        Ok(Released::Restored) => out!("hanyeong: 입력 소스 단축키를 원래대로 되돌렸습니다"),
         Ok(Released::Forgotten) => {
-            println!("hanyeong: 입력 소스 단축키는 그 뒤에 바뀌어 있어 그대로 둡니다");
+            out!("hanyeong: 입력 소스 단축키는 그 뒤에 바뀌어 있어 그대로 둡니다");
         }
         Ok(Released::Untouched) => {}
         Err(error) => {
-            eprintln!("hanyeong: {error}");
+            err!("hanyeong: {error}");
             return false;
         }
     }
@@ -166,7 +166,7 @@ fn check_trust() -> bool {
         trust::request();
         trust::open_settings();
         trust::set_prompted(true);
-        eprintln!(
+        err!(
             "hanyeong: 접근성 권한이 없습니다. 방금 연 손쉬운 사용 화면에서 hanyeong(터미널에서 띄웠다면 \
              그 터미널)을 켜 주세요. 목록에 없으면 + 로 ~/Applications/hanyeong.app 을 더합니다"
         );
@@ -182,50 +182,52 @@ pub fn run(keys: Keys) -> bool {
         return false;
     }
     if let Some(name) = rival() {
-        eprintln!(
+        err!(
             "hanyeong: {name} 이(가) 돌고 있습니다. 함께 돌면 서로의 키를 주고받으므로 먼저 종료하세요"
         );
         return false;
     }
     // 탭을 먼저 붙인다. 매핑부터 걸면 그 사이의 누름이 뗄 때 전환된다.
     let Some(tap) = Tap::install(PressGate::new(keys.target.key_code())) else {
-        eprintln!("hanyeong: 이벤트 탭을 만들지 못했습니다");
+        err!("hanyeong: 이벤트 탭을 만들지 못했습니다");
         return false;
     };
     let mut app = new_app(keys);
     if let Err(error) = hotkey::claim(keys.target.key_code()) {
-        eprintln!("hanyeong: {error}");
+        err!("hanyeong: {error}");
         undo(&app);
         return false;
     }
     app.apply_all();
-    println!(
+    out!(
         "hanyeong: 준비됐습니다 ({} → {})",
         keys.source.name(),
         keys.target.name()
     );
     let tray = Tray::install(&tap);
     if tray.is_none() {
-        eprintln!("hanyeong: 메뉴바 아이콘을 올리지 못했습니다. 아이콘 없이 계속합니다");
+        err!("hanyeong: 메뉴바 아이콘을 올리지 못했습니다. 아이콘 없이 계속합니다");
     }
     let ran = session::run(&mut app, IDLE_MS, tray.as_ref());
     drop(tray);
     let stats = tap.stats();
     drop(tap);
-    println!(
+    out!(
         "hanyeong: 전환 {}번, 폭주 차단 {}번, 탭 꺼짐 {}번",
-        stats.switches, stats.storms, stats.disabled
+        stats.switches,
+        stats.storms,
+        stats.disabled
     );
     let undone = undo(&app);
     if let Err(error) = &ran {
-        eprintln!("hanyeong: {error}");
+        err!("hanyeong: {error}");
     }
     ran.is_ok() && undone
 }
 
 pub fn restore(keys: Keys) -> bool {
     if running("hanyeong") > 0 {
-        eprintln!("hanyeong: 실행 중인 hanyeong 이 있습니다. 그것을 종료하면 스스로 되돌립니다");
+        err!("hanyeong: 실행 중인 hanyeong 이 있습니다. 그것을 종료하면 스스로 되돌립니다");
         return false;
     }
     undo(&new_app(keys))

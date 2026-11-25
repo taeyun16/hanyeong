@@ -13,6 +13,24 @@
 #![cfg(target_os = "macos")]
 #![forbid(unsafe_code)]
 
+/// 표준 출력에 한 줄 쓴다. 받는 쪽이 먼저 닫혔으면(`hanyeong status | head -1`) 그 줄은 버린다.
+/// `println!` 은 그때 패닉하고, 릴리스 빌드는 `panic = "abort"` 라 `run` 이 키 매핑과 단축키를
+/// 되돌리지 못한 채 끝난다. 이 크레이트에서는 `println!`·`eprintln!` 대신 이것들을 쓴다.
+macro_rules! out {
+    ($($arg:tt)*) => {{
+        use std::io::Write as _;
+        let _ = writeln!(std::io::stdout(), $($arg)*);
+    }};
+}
+
+/// `out!` 의 표준 오류 판.
+macro_rules! err {
+    ($($arg:tt)*) => {{
+        use std::io::Write as _;
+        let _ = writeln!(std::io::stderr(), $($arg)*);
+    }};
+}
+
 mod app;
 mod install;
 mod report;
@@ -32,7 +50,7 @@ fn main() -> ExitCode {
     let command = match args::parse(words.iter().map(String::as_str)) {
         Ok(command) => command,
         Err(error) => {
-            eprintln!("hanyeong: {error}\n{USAGE}");
+            err!("hanyeong: {error}\n{USAGE}");
             return ExitCode::from(EXIT_USAGE);
         }
     };
@@ -44,11 +62,11 @@ fn main() -> ExitCode {
         Command::Install(keys) => install::install(keys),
         Command::Uninstall => install::uninstall(),
         Command::Help => {
-            println!("{USAGE}");
+            out!("{USAGE}");
             true
         }
         Command::Version => {
-            println!("hanyeong {}", env!("CARGO_PKG_VERSION"));
+            out!("hanyeong {}", env!("CARGO_PKG_VERSION"));
             true
         }
     };

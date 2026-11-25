@@ -74,7 +74,7 @@ fn write_bundle(paths: &Paths, exe: &[u8]) -> io::Result<()> {
     let icns = format!("{}/AppIcon.icns", paths.resources);
     fs::write(&png, ICON_PNG)?;
     if !quiet("sips", &["-s", "format", "icns", &png, "--out", &icns]) {
-        eprintln!("hanyeong: 아이콘을 만들지 못했습니다. 아이콘 없이 설치합니다");
+        err!("hanyeong: 아이콘을 만들지 못했습니다. 아이콘 없이 설치합니다");
     }
     remove_file(&png)
 }
@@ -114,13 +114,13 @@ fn sign(home: &str, paths: &Paths) {
         &["--force", "--sign", with, "--identifier", LABEL, &paths.app],
     );
     match (signed, identity.is_some()) {
-        (false, _) => eprintln!(
-            "hanyeong: 서명하지 못했습니다(codesign). 접근성 권한이 붙지 않을 수 있습니다"
-        ),
-        (true, true) => {
-            println!("전용 인증서로 서명했습니다. 새 버전을 설치해도 접근성 권한이 남습니다.")
+        (false, _) => {
+            err!("hanyeong: 서명하지 못했습니다(codesign). 접근성 권한이 붙지 않을 수 있습니다")
         }
-        (true, false) => println!(
+        (true, true) => {
+            out!("전용 인증서로 서명했습니다. 새 버전을 설치해도 접근성 권한이 남습니다.")
+        }
+        (true, false) => out!(
             "임시 서명입니다. 새 버전을 설치하면 접근성 권한을 다시 줘야 할 수 있습니다(README 의 \"권한 유지하기\")."
         ),
     }
@@ -128,7 +128,7 @@ fn sign(home: &str, paths: &Paths) {
 
 pub fn install(keys: Keys) -> bool {
     let (Some(home), Some(domain)) = (home(), domain()) else {
-        eprintln!("hanyeong: 홈 폴더나 사용자 번호를 알 수 없습니다");
+        err!("hanyeong: 홈 폴더나 사용자 번호를 알 수 없습니다");
         return false;
     };
     let paths = Paths::under(&home);
@@ -136,26 +136,26 @@ pub fn install(keys: Keys) -> bool {
     let exe = match std::env::current_exe().and_then(fs::read) {
         Ok(exe) => exe,
         Err(error) => {
-            eprintln!("hanyeong: 실행 파일을 읽지 못했습니다: {error}");
+            err!("hanyeong: 실행 파일을 읽지 못했습니다: {error}");
             return false;
         }
     };
     stop(&domain);
     if let Err(error) = write_bundle(&paths, &exe).and_then(|()| write_agent(&paths, keys)) {
-        eprintln!("hanyeong: 설치하지 못했습니다: {error}");
+        err!("hanyeong: 설치하지 못했습니다: {error}");
         return false;
     }
     sign(&home, &paths);
     if !quiet("launchctl", &["bootstrap", &domain, &paths.agent]) {
-        eprintln!(
+        err!(
             "hanyeong: 로그인 항목을 등록하지 못했습니다: {}",
             paths.agent
         );
         return false;
     }
-    println!("설치했습니다: {}", paths.app);
-    println!("로그: {}", paths.log);
-    println!(
+    out!("설치했습니다: {}", paths.app);
+    out!("로그: {}", paths.log);
+    out!(
         "처음이면 손쉬운 사용 화면이 열립니다. 목록에서 hanyeong 을 켜면 10초 안에 메뉴바에 '한' 이 뜹니다."
     );
     true
@@ -163,16 +163,16 @@ pub fn install(keys: Keys) -> bool {
 
 pub fn uninstall() -> bool {
     let (Some(home), Some(domain)) = (home(), domain()) else {
-        eprintln!("hanyeong: 홈 폴더나 사용자 번호를 알 수 없습니다");
+        err!("hanyeong: 홈 폴더나 사용자 번호를 알 수 없습니다");
         return false;
     };
     let paths = Paths::under(&home);
     stop(&domain);
     if let Err(error) = remove_file(&paths.agent).and_then(|()| remove_dir(&paths.app)) {
-        eprintln!("hanyeong: 지우지 못했습니다: {error}");
+        err!("hanyeong: 지우지 못했습니다: {error}");
         return false;
     }
-    println!("지웠습니다: {}, {}", paths.agent, paths.app);
-    println!("접근성 목록의 항목은 남습니다. 지우려면: tccutil reset Accessibility {LABEL}");
+    out!("지웠습니다: {}, {}", paths.agent, paths.app);
+    out!("접근성 목록의 항목은 남습니다. 지우려면: tccutil reset Accessibility {LABEL}");
     true
 }
