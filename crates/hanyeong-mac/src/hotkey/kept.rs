@@ -5,14 +5,14 @@
 
 use core::ptr;
 
+use hanyeong_core::install::LABEL;
 use hanyeong_core::keys::TargetKey;
 use hanyeong_core::shortcut::Written;
 
+use super::HotkeyError;
 use crate::cf::{self, Owned};
 use crate::ffi::{self, Ref};
-use crate::hotkey::HotkeyError;
 
-pub const DOMAIN: &str = "dev.hanyeong";
 const RECORD: &str = "shortcut60.record";
 const WRITTEN: &str = "written";
 const ORIGINAL: &str = "original";
@@ -47,7 +47,7 @@ pub struct Kept {
 impl Kept {
     pub fn new() -> Option<Self> {
         Some(Self {
-            domain: cf::string(DOMAIN)?,
+            domain: cf::string(LABEL)?,
             record: cf::string(RECORD)?,
             legacy_saved: cf::string(LEGACY_SAVED)?,
             legacy_original: cf::string(LEGACY_ORIGINAL)?,
@@ -134,7 +134,7 @@ impl Kept {
     fn synchronize(&self) -> Result<(), HotkeyError> {
         // SAFETY: 도메인은 살아 있는 CFString 이다.
         let stored = unsafe { ffi::CFPreferencesAppSynchronize(self.domain.get()) != 0 };
-        stored.then_some(()).ok_or(HotkeyError::Save(DOMAIN))
+        stored.then_some(()).ok_or(HotkeyError::Save(LABEL))
     }
 
     /// 기록을 지운다.

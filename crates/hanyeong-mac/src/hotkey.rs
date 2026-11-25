@@ -1,6 +1,6 @@
 //! 시스템 단축키 60번(`이전 입력 소스 선택`)을 우리 F-키로 맞추고 되돌린다.
 //!
-//! 바꾸기 전의 값은 우리 설정 도메인에 남긴다(`kept.rs`). 되돌릴 때는 지금 값이 우리가 써 넣은
+//! 바꾸기 전의 값은 우리 설정 도메인에 남긴다(하위 모듈 `kept`). 되돌릴 때는 지금 값이 우리가 써 넣은
 //! 값일 때만 되돌린다. 무엇을 쓸지는 `hanyeong_core::shortcut` 의 `claim`·`release` 가 정하고, 여기서는 그
 //! 순서대로 쓰기만 한다. 쓰기의 순서는 `hanyeong-core/tests/shortcut60_replay.rs` 가 옮겨 적어 시험한다.
 
@@ -13,7 +13,9 @@ use hanyeong_core::shortcut::{self, Claim, Entry, PREVIOUS_SOURCE, Release};
 use crate::cf::{self, Owned};
 use crate::entry::{build, parse};
 use crate::ffi::{self, Ref};
-use crate::kept::Kept;
+
+mod kept;
+use kept::Kept;
 
 const SYSTEM_DOMAIN: &str = "com.apple.symbolichotkeys";
 const SYSTEM_KEY: &str = "AppleSymbolicHotKeys";
@@ -64,7 +66,6 @@ struct Names {
     system: Owned,
     key: Owned,
     slot: Owned,
-    kept: Kept,
 }
 
 impl Names {
@@ -74,7 +75,6 @@ impl Names {
             system: text(SYSTEM_DOMAIN)?,
             key: text(SYSTEM_KEY)?,
             slot: text(PREVIOUS_SOURCE)?,
-            kept: Kept::new().ok_or(HotkeyError::Encode)?,
         })
     }
 
@@ -149,11 +149,12 @@ pub fn read() -> Option<Entry> {
 /// 값을 만들거나 저장하거나 반영하지 못했을 때.
 pub fn claim(key_code: i64) -> Result<Claimed, HotkeyError> {
     let names = Names::new()?;
+    let kept = Kept::new().ok_or(HotkeyError::Encode)?;
     let all = names.all();
     let current = all
         .as_ref()
         .map_or(ptr::null(), |all| cf::get(all.get(), PREVIOUS_SOURCE));
-    let record = names.kept.read();
+    let record = kept.read();
     let (written, fresh) = match shortcut::claim(parse(current).as_ref(), record.written, key_code)
     {
         Claim::Already => return Ok(Claimed::Already),
@@ -161,9 +162,7 @@ pub fn claim(key_code: i64) -> Result<Claimed, HotkeyError> {
     };
     let entry = build(key_code).ok_or(HotkeyError::Encode)?;
     // 기록을 먼저 남기고 60번을 쓴다. 거꾸로 하면 그 사이에 죽었을 때 되돌릴 값이 없다.
-    names
-        .kept
-        .store(written, if fresh { current } else { record.original() })?;
+    kept.store(written, if fresh { current } else { record.original() })?;
     names.write(all.as_ref(), entry.get())?;
     Ok(Claimed::Written)
 }
@@ -174,7 +173,8 @@ pub fn claim(key_code: i64) -> Result<Claimed, HotkeyError> {
 /// 값을 저장하거나 반영하지 못했을 때.
 pub fn release() -> Result<Released, HotkeyError> {
     let names = Names::new()?;
-    let record = names.kept.read();
+    let kept = Kept::new().ok_or(HotkeyError::Encode)?;
+    let record = kept.read();
     let all = if record.written.is_empty() {
         None
     } else {
@@ -188,11 +188,11 @@ pub fn release() -> Result<Released, HotkeyError> {
         Release::Restore => {
             // 60번을 먼저 되돌리고 기록을 지운다. 거꾸로 하면 그 사이에 죽었을 때 되돌릴 값이 없다.
             names.write(all.as_ref(), record.original())?;
-            names.kept.forget()?;
+            kept.forget()?;
             Ok(Released::Restored)
         }
         Release::Forget => {
-            names.kept.forget()?;
+            kept.forget()?;
             Ok(Released::Forgotten)
         }
     }

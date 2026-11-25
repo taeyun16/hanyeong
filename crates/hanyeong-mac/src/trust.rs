@@ -1,5 +1,7 @@
 //! 접근성 권한. 이벤트 탭을 만들고 키 이벤트를 보내려면 필요하다.
 
+use hanyeong_core::install::LABEL;
+
 use crate::cf;
 use crate::ffi;
 
@@ -19,7 +21,6 @@ pub fn request() -> bool {
         .is_some_and(|options| unsafe { ffi::AXIsProcessTrustedWithOptions(options.get()) != 0 })
 }
 
-const OWN_DOMAIN: &str = "dev.hanyeong";
 const PROMPTED: &str = "trust.prompted";
 const SETTINGS_URL: &str =
     "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility";
@@ -35,7 +36,7 @@ pub fn open_settings() -> bool {
 /// 권한을 달라고 이미 안내했는가. 로그인 항목으로 되풀이해 뜰 때 창을 거듭 열지 않으려고 남긴다.
 #[must_use]
 pub fn prompted() -> bool {
-    let (Some(key), Some(domain)) = (cf::string(PROMPTED), cf::string(OWN_DOMAIN)) else {
+    let (Some(key), Some(domain)) = (cf::string(PROMPTED), cf::string(LABEL)) else {
         return false;
     };
     // SAFETY: 키와 도메인은 살아 있는 CFString 이고, 반환값은 Copy 규칙으로 우리가 소유한다.
@@ -45,7 +46,7 @@ pub fn prompted() -> bool {
 
 /// 안내했다는 표시를 남기거나 지운다.
 pub fn set_prompted(prompted: bool) -> bool {
-    let (Some(key), Some(domain)) = (cf::string(PROMPTED), cf::string(OWN_DOMAIN)) else {
+    let (Some(key), Some(domain)) = (cf::string(PROMPTED), cf::string(LABEL)) else {
         return false;
     };
     // SAFETY: 키와 도메인은 살아 있는 CFString 이고, 값은 상수 CFBoolean 이거나 null(지움)이다.

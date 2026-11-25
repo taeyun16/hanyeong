@@ -10,7 +10,6 @@ mod entry;
 mod ffi;
 pub mod hid;
 pub mod hotkey;
-mod kept;
 mod objc;
 pub mod probe;
 pub mod session;
