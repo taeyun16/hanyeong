@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/*"]
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 # 빌드할 수 있는 가장 낮은 Rust(edition 2024 의 let 체인). Homebrew·cargo install 은 사용자의 Rust 로
 # 빌드하므로 올리지 않는다. CI 의 MSRV 잡이 이 버전으로 빌드·테스트한다.
