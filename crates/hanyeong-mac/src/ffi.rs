@@ -49,6 +49,8 @@ pub const FLAG_NUMERIC_PAD: u64 = 0x20_0000;
 pub const FLAG_SECONDARY_FN: u64 = 0x80_0000;
 
 pub const CLOCK_UPTIME_RAW: c_int = 8;
+/// `QOS_CLASS_USER_INTERACTIVE`: 사용자 입력에 바로 반응해야 하는 일.
+pub const QOS_USER_INTERACTIVE: u32 = 0x21;
 pub const SIGHUP: c_int = 1;
 pub const SIGINT: c_int = 2;
 pub const SIGTERM: c_int = 15;
@@ -87,6 +89,7 @@ unsafe extern "C" {
     #[link_name = "kCFRunLoopDefaultMode"]
     pub static DEFAULT_MODE: Ref;
 
+    pub fn CFRetain(object: Ref) -> Ref;
     pub fn CFRelease(object: Ref);
     pub fn CFEqual(left: Ref, right: Ref) -> Boolean;
     pub fn CFGetTypeID(object: Ref) -> usize;
@@ -261,4 +264,5 @@ unsafe extern "C" {
     pub fn signal(signal: c_int, handler: usize) -> usize;
     pub fn clock_gettime_nsec_np(clock: c_int) -> u64;
     pub fn arc4random() -> u32;
+    pub fn pthread_set_qos_class_self_np(class: u32, relative_priority: c_int) -> c_int;
 }

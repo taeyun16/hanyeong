@@ -210,8 +210,7 @@ pub fn run(keys: Keys) -> bool {
     }
     let ran = session::run(&mut app, IDLE_MS, tray.as_ref());
     drop(tray);
-    let stats = tap.stats();
-    drop(tap);
+    let stats = tap.stop();
     out!(
         "hanyeong: 전환 {}번, 폭주 차단 {}번, 탭 꺼짐 {}번",
         stats.switches,

@@ -1,4 +1,4 @@
-//! Objective-C 런타임을 부르는 최소한의 도우미. AppKit 의 메뉴바 아이콘에만 쓴다.
+//! Objective-C 런타임을 부르는 최소한의 도우미. AppKit 의 메뉴바 아이콘과 App Nap 끄기에 쓴다.
 
 use core::ffi::{CStr, c_char, c_void};
 use core::mem;
@@ -166,5 +166,47 @@ pub unsafe fn post_wakeup(app: Id) {
         let post: extern "C" fn(Id, Sel, Id, bool) =
             mem::transmute(objc_msgSend as unsafe extern "C" fn());
         post(app, sel(c"postEvent:atStart:"), event, true);
+    }
+}
+
+/// `NSActivityUserInitiatedAllowingIdleSystemSleep | NSActivityLatencyCritical`: App Nap 과 타이머 묶기를
+/// 끄고 입출력을 늦추지 않게 하되, 시스템이나 화면이 잠드는 것은 막지 않는다.
+const QUICK_ACTIVITY: u64 = 0x00EF_FFFF | 0xFF_0000_0000;
+
+/// 프로세스가 App Nap 에 들지 않게 하는 활동을 시작한다. 돌려준 토큰은 우리가 retain 한 것이고,
+/// `end_activity` 에 넘겨야 끝난다. 실패하면 null.
+///
+/// # Safety
+/// `reason` 은 살아 있는 `NSString` 이어야 한다.
+pub unsafe fn begin_activity(reason: *const c_void) -> Id {
+    // SAFETY: -[NSProcessInfo beginActivityWithOptions:reason:] 는 `NSActivityOptions`(u64) 하나와
+    // NSString 하나를 받아 autorelease 된 객체를 돌려준다. 그것을 retain 해 우리 것으로 만든다.
+    unsafe {
+        let info = send(class(c"NSProcessInfo"), sel(c"processInfo"));
+        let begin: extern "C" fn(Id, Sel, u64, *const c_void) -> Id =
+            mem::transmute(objc_msgSend as unsafe extern "C" fn());
+        let token = begin(
+            info,
+            sel(c"beginActivityWithOptions:reason:"),
+            QUICK_ACTIVITY,
+            reason,
+        );
+        send(token, sel(c"retain"))
+    }
+}
+
+/// `begin_activity` 로 시작한 활동을 끝내고 토큰을 놓는다. null 이면 아무 일도 하지 않는다.
+///
+/// # Safety
+/// `token` 은 null 이거나 `begin_activity` 가 돌려준, 아직 끝내지 않은 토큰이어야 한다.
+pub unsafe fn end_activity(token: Id) {
+    if token.is_null() {
+        return;
+    }
+    // SAFETY: -[NSProcessInfo endActivity:] 는 토큰 하나를 받는다. 토큰은 우리가 retain 한 것이다.
+    unsafe {
+        let info = send(class(c"NSProcessInfo"), sel(c"processInfo"));
+        send_id(info, sel(c"endActivity:"), token);
+        send(token, sel(c"release"));
     }
 }
