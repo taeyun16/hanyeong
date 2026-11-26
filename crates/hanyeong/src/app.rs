@@ -3,6 +3,7 @@
 use std::time::Duration;
 
 use hanyeong_core::args::Keys;
+use hanyeong_core::lag::{self, Lag};
 use hanyeong_core::mapping::{self, Change, Pair};
 use hanyeong_core::press::PressGate;
 use hanyeong_core::recheck::{IDLE_MS, Recheck};
@@ -105,15 +106,69 @@ impl App {
     }
 }
 
-impl Events for App {
+/// 탭이 붙어 도는 동안의 앱. 확인할 때마다 탭이 모은 대기 분포를 가져와, 늦은 누름이 있었으면 남긴다.
+struct Running<'a> {
+    app: &'a mut App,
+    tap: &'a Tap,
+    lag: Lag,
+}
+
+impl Running<'_> {
+    fn collect(&mut self) {
+        let recent = self.tap.take_lag();
+        if recent.slow() > 0 {
+            out!(
+                "hanyeong: 지난 확인 뒤로 한영 키가 늦게 닿았습니다: {} ms 이상 {}번, 가장 늦은 것 {:.1} ms",
+                lag::SLOW_MS,
+                recent.slow(),
+                ms(recent.max_ns)
+            );
+        }
+        self.lag.add(&recent);
+    }
+}
+
+impl Events for Running<'_> {
     fn recheck(&mut self) -> u32 {
-        self.apply_all();
-        self.recheck.checked()
+        self.collect();
+        self.app.apply_all();
+        self.app.recheck.checked()
     }
 
     fn device_changed(&mut self) -> u32 {
-        self.recheck.device_changed()
+        self.app.recheck.device_changed()
     }
+}
+
+/// 로그에 보이는 ms 값. 2^53 ns(약 104일)까지는 정확하다.
+fn ms(ns: u64) -> f64 {
+    ns as f64 / 1_000_000.0
+}
+
+/// 실행 전체의 대기 분포를 한 줄로 남긴다.
+fn report_lag(total: &Lag) {
+    let mut spread = String::new();
+    let mut lower = 0_u64;
+    for (index, count) in total.counts.iter().enumerate() {
+        if !spread.is_empty() {
+            spread.push_str(" · ");
+        }
+        match lag::BOUNDS_MS.get(index) {
+            Some(upper) => {
+                spread.push_str(&format!("{lower}~{upper} ms {count}"));
+                lower = *upper;
+            }
+            None => spread.push_str(&format!("{lower} ms~ {count}")),
+        }
+    }
+    out!(
+        "hanyeong: 한영 키가 hanyeong 에 닿기까지: {}번, {} ms 이상 {}번, 가장 늦은 것 {:.1} ms, 잴 수 없음 {}번 ({spread})",
+        total.measured(),
+        lag::SLOW_MS,
+        total.slow(),
+        ms(total.max_ns),
+        total.unknown
+    );
 }
 
 fn new_app(keys: Keys) -> App {
@@ -208,15 +263,23 @@ pub fn run(keys: Keys) -> bool {
     if tray.is_none() {
         err!("hanyeong: 메뉴바 아이콘을 올리지 못했습니다. 아이콘 없이 계속합니다");
     }
-    let ran = session::run(&mut app, IDLE_MS, tray.as_ref());
+    let mut running = Running {
+        app: &mut app,
+        tap: &tap,
+        lag: Lag::default(),
+    };
+    let ran = session::run(&mut running, IDLE_MS, tray.as_ref());
+    let mut total = running.lag;
     drop(tray);
     let stats = tap.stop();
+    total.add(&stats.lag);
     out!(
         "hanyeong: 전환 {}번, 폭주 차단 {}번, 탭 꺼짐 {}번",
         stats.switches,
         stats.storms,
         stats.disabled
     );
+    report_lag(&total);
     let undone = undo(&app);
     if let Err(error) = &ran {
         err!("hanyeong: {error}");

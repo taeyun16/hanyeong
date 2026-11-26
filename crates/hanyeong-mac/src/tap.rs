@@ -9,9 +9,10 @@
 use core::ffi::c_void;
 use core::ptr;
 use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, mpsc};
+use std::sync::{Arc, Mutex, mpsc};
 use std::thread::{self, JoinHandle};
 
+use hanyeong_core::lag::{self, Lag, Timebase};
 use hanyeong_core::press::{self, Decision, Key, Kind, PressGate};
 
 use crate::cf::{self, Owned};
@@ -31,6 +32,8 @@ struct Shared {
     paused: AtomicBool,
     /// 멈추거나 다시 켤 때마다 하나 는다. 콜백이 달라진 것을 보면 누름 상태를 잊는다.
     epoch: AtomicU64,
+    /// 메인 스레드가 마지막으로 가져간 뒤의 대기 분포. 콜백은 기다리지 않고 넣을 수 있을 때만 넣는다.
+    lag: Mutex<Lag>,
 }
 
 /// 탭 스레드에서만 쓰는 것.
@@ -48,6 +51,22 @@ struct State {
     shared: Arc<Shared>,
     /// 콜백이 마지막으로 본 `Shared::epoch`.
     epoch: u64,
+    /// 키의 만든 시각을 읽는 데 쓰는 비율.
+    timebase: Timebase,
+    /// 아직 `Shared::lag` 에 넣지 못한 대기.
+    pending: Lag,
+}
+
+impl State {
+    /// 전환한 누름이 기다린 시간을 남긴다. 메인 스레드가 분포를 가져가는 중이면 다음 누름 때 넣는다.
+    fn note_lag(&mut self, now_ns: u64, created: u64) {
+        self.pending
+            .record(lag::waited_ns(now_ns, created, self.timebase));
+        if let Ok(mut shared) = self.shared.lag.try_lock() {
+            shared.add(&self.pending);
+            self.pending = Lag::default();
+        }
+    }
 }
 
 /// 탭 스레드가 메인 스레드에 넘기는 두 객체. 둘 다 우리가 retain 한 참조다.
@@ -75,6 +94,8 @@ pub struct TapStats {
     pub storms: u64,
     /// 시스템이 탭을 껐던 횟수(콜백이 느렸다는 뜻이다).
     pub disabled: u64,
+    /// 마지막으로 `Tap::take_lag` 한 뒤의 대기 분포.
+    pub lag: Lag,
 }
 
 pub fn now_ns() -> u64 {
@@ -138,12 +159,13 @@ extern "C" fn callback(
             ffi::CGEventGetTimestamp(event),
         )
     };
+    let now_ns = now_ns();
     let decision = state.gate.decide(Key {
         kind,
         code,
         repeat,
         ours: press::is_ours(user_data, state.marker, source_pid, state.pid),
-        now_ns: now_ns(),
+        now_ns,
         created_ns,
     });
     match decision {
@@ -151,6 +173,7 @@ extern "C" fn callback(
         Decision::Swallow => ptr::null_mut(),
         Decision::Switch => {
             pulse(event, state.source, code);
+            state.note_lag(now_ns, created_ns);
             ptr::null_mut()
         }
     }
@@ -218,6 +241,9 @@ fn run_tap(
     // SAFETY: `pulse_source` 는 방금 만든 살아 있는 이벤트 소스다.
     unsafe { ffi::CGEventSourceSetUserData(pulse_source.get(), marker) };
     let epoch = shared.epoch.load(Ordering::Acquire);
+    let mut timebase = ffi::MachTimebase::default();
+    // SAFETY: `timebase` 는 살아 있는 구조체이고 함수가 채운다. 실패하면 0 이 남아 틱으로 읽지 않는다.
+    unsafe { ffi::mach_timebase_info(&raw mut timebase) };
     let state = Box::into_raw(Box::new(State {
         gate,
         marker,
@@ -227,6 +253,11 @@ fn run_tap(
         disabled: 0,
         shared,
         epoch,
+        timebase: Timebase {
+            numer: timebase.numer,
+            denom: timebase.denom,
+        },
+        pending: Lag::default(),
     }));
     // SAFETY: `callback` 의 시그니처는 CGEventTapCallBack 과 같고, `state` 는 탭보다 오래 산다.
     let port = unsafe {
@@ -276,10 +307,18 @@ fn run_tap(
         ffi::CGEventTapEnable(port.get(), false);
         ffi::CFMachPortInvalidate(port.get());
         let state = Box::from_raw(state);
+        let mut lag = state
+            .shared
+            .lag
+            .lock()
+            .map(|mut lag| core::mem::take(&mut *lag))
+            .unwrap_or_default();
+        lag.add(&state.pending);
         TapStats {
             switches: state.gate.switches(),
             storms: state.gate.storms(),
             disabled: state.disabled,
+            lag,
         }
     }
 }
@@ -291,6 +330,7 @@ impl Tap {
         let shared = Arc::new(Shared {
             paused: AtomicBool::new(false),
             epoch: AtomicU64::new(0),
+            lag: Mutex::new(Lag::default()),
         });
         let (ready, answer) = mpsc::sync_channel(1);
         let theirs = Arc::clone(&shared);
@@ -324,7 +364,17 @@ impl Tap {
         unsafe { ffi::CGEventTapEnable(self.port.get(), !paused) };
     }
 
-    /// 탭 스레드를 멈추고, 탭이 살아 있는 동안 한 일을 돌려준다.
+    /// 마지막으로 부른 뒤에 전환한 누름들의 대기 분포를 가져간다.
+    #[must_use]
+    pub fn take_lag(&self) -> Lag {
+        self.shared
+            .lag
+            .lock()
+            .map(|mut lag| core::mem::take(&mut *lag))
+            .unwrap_or_default()
+    }
+
+    /// 탭 스레드를 멈추고, 탭이 살아 있는 동안 한 일을 돌려준다. 대기 분포는 마지막 `take_lag` 뒤의 것이다.
     #[must_use]
     pub fn stop(mut self) -> TapStats {
         self.finish()

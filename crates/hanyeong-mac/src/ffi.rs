@@ -13,6 +13,14 @@ pub struct Opaque {
     _private: [u8; 0],
 }
 
+/// `mach_timebase_info_data_t`.
+#[repr(C)]
+#[derive(Default)]
+pub struct MachTimebase {
+    pub numer: u32,
+    pub denom: u32,
+}
+
 #[repr(C)]
 pub struct TimerContext {
     pub version: Index,
@@ -264,5 +272,6 @@ unsafe extern "C" {
     pub fn signal(signal: c_int, handler: usize) -> usize;
     pub fn clock_gettime_nsec_np(clock: c_int) -> u64;
     pub fn arc4random() -> u32;
+    pub fn mach_timebase_info(info: *mut MachTimebase) -> c_int;
     pub fn pthread_set_qos_class_self_np(class: u32, relative_priority: c_int) -> c_int;
 }
