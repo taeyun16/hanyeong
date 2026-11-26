@@ -21,6 +21,18 @@ pub struct MachTimebase {
     pub denom: u32,
 }
 
+/// `thread_time_constraint_policy_data_t`. 시간은 mach 틱이다.
+#[repr(C)]
+pub struct TimeConstraint {
+    pub period: u32,
+    pub computation: u32,
+    pub constraint: u32,
+    pub preemptible: c_int,
+}
+
+pub const THREAD_TIME_CONSTRAINT_POLICY: u32 = 2;
+pub const THREAD_TIME_CONSTRAINT_POLICY_COUNT: u32 = 4;
+
 #[repr(C)]
 pub struct TimerContext {
     pub version: Index,
@@ -273,5 +285,15 @@ unsafe extern "C" {
     pub fn clock_gettime_nsec_np(clock: c_int) -> u64;
     pub fn arc4random() -> u32;
     pub fn mach_timebase_info(info: *mut MachTimebase) -> c_int;
+    #[link_name = "mach_task_self_"]
+    pub static MACH_TASK_SELF: u32;
+    pub fn mach_thread_self() -> u32;
+    pub fn mach_port_deallocate(task: u32, name: u32) -> c_int;
+    pub fn thread_policy_set(
+        thread: u32,
+        flavor: u32,
+        info: *const TimeConstraint,
+        count: u32,
+    ) -> c_int;
     pub fn pthread_set_qos_class_self_np(class: u32, relative_priority: c_int) -> c_int;
 }

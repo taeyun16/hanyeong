@@ -34,6 +34,16 @@ impl Timebase {
         let ns = u128::from(ticks) * u128::from(self.numer) / u128::from(self.denom);
         u64::try_from(ns).ok()
     }
+
+    /// 나노초를 mach 틱으로 바꾼다. `u32` 에 들지 않으면 `None`.
+    #[must_use]
+    pub fn ticks(self, ns: u64) -> Option<u32> {
+        if self.numer == 0 {
+            return None;
+        }
+        let ticks = u128::from(ns) * u128::from(self.denom) / u128::from(self.numer);
+        u32::try_from(ticks).ok()
+    }
 }
 
 /// 키가 만들어진 뒤 `now_ns` 까지 기다린 시간. 만든 시각을 나노초로도 틱으로도 읽을 수 없으면 `None`.
@@ -136,6 +146,14 @@ mod tests {
         let created = (NOW - 7 * MS) * 3 / 125;
         let waited = waited_ns(NOW, created, ARM).expect("틱으로 읽혀야 한다");
         assert!(waited.abs_diff(7 * MS) < 1_000, "{waited}");
+    }
+
+    #[test]
+    fn nanoseconds_become_ticks_for_thread_policies() {
+        assert_eq!(ARM.ticks(MS), Some(24_000));
+        assert_eq!(Timebase { numer: 1, denom: 1 }.ticks(MS), Some(1_000_000));
+        assert_eq!(Timebase { numer: 0, denom: 1 }.ticks(MS), None);
+        assert_eq!(ARM.ticks(u64::MAX), None);
     }
 
     #[test]

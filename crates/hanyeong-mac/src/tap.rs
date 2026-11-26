@@ -4,7 +4,12 @@
 //!
 //! 탭은 전용 스레드에서 돈다. 메인 스레드는 30초마다 키 매핑을 다시 확인하고 메뉴바를 그리는데,
 //! 기기가 바쁘고 메모리가 스왑에 나가 있으면 그 일이 길어진다. 같은 스레드였다면 그동안 누른 한영
-//! 키가 기다렸다. 이 스레드는 사용자 입력용 QoS 로 돌고, 탭이 사는 동안 App Nap 을 끈다.
+//! 키가 기다렸다. 이 스레드는 실시간 우선순위로 돌고(안 되면 사용자 입력용 QoS), 탭이 사는 동안
+//! App Nap 을 끈다.
+//!
+//! 실시간인 까닭(2026-11-26 실측, 부하 평균 109~145): 실시간이 아닌 스레드는 깨어남의 약 1% 가
+//! 50 ms 이상, 최대 192 ms 늦었고, 실시간 스레드는 최대 0.6 ms 였다. 사용자 입력용 QoS 는 메뉴바 앱에서
+//! 37 까지만 올라, CPU 를 쓰는 46~47 의 스레드들 아래에 남는다.
 
 use core::ffi::c_void;
 use core::ptr;
@@ -22,6 +27,12 @@ use crate::objc;
 /// 다시 보내는 한 쌍에 남기는 플래그: F-키임을 나타내는 둘과 Caps Lock 상태.
 /// 눌려 있던 수정키는 지운다. 남기면 단축키와 일치하지 않는다.
 const KEPT_FLAGS: u64 = ffi::FLAG_SECONDARY_FN | ffi::FLAG_NUMERIC_PAD | ffi::FLAG_ALPHA_SHIFT;
+
+/// 실시간 스레드가 한 번 깨어나 쓸 것으로 알리는 CPU 시간. 콜백은 이보다 훨씬 짧다. 이것을 자주 넘기면
+/// 커널이 실시간을 거둔다.
+const RT_COMPUTATION_NS: u64 = 500_000;
+/// 깨어난 뒤 일을 마쳐야 하는 시간.
+const RT_CONSTRAINT_NS: u64 = 1_000_000;
 
 /// App Nap 을 끄는 까닭으로 시스템에 남기는 말.
 const ACTIVITY_REASON: &str = "한영 키 입력 처리";
@@ -73,6 +84,7 @@ impl State {
 struct Remote {
     run_loop: ffi::Ref,
     port: ffi::Ref,
+    realtime: bool,
 }
 
 // SAFETY: 런 루프와 mach 포트는 CoreFoundation 객체라 참조를 어느 스레드에서 놓아도 되고, 메인
@@ -85,6 +97,7 @@ pub struct Tap {
     run_loop: Owned,
     port: Owned,
     thread: Option<JoinHandle<TapStats>>,
+    realtime: bool,
 }
 
 /// 탭이 살아 있는 동안 한 일.
@@ -214,20 +227,63 @@ fn serve(
 ) -> TapStats {
     // SAFETY: 지금 스레드의 QoS 를 바꾸는 호출이다. 실패해도 기본 QoS 로 계속 돈다.
     unsafe { ffi::pthread_set_qos_class_self_np(ffi::QOS_USER_INTERACTIVE, 0) };
+    let timebase = timebase();
+    let realtime = make_realtime(timebase);
     let reason = cf::string(ACTIVITY_REASON);
     // SAFETY: `reason` 은 살아 있는 CFString(= NSString)이다. 토큰은 아래에서 끝낸다.
     let activity = reason.as_ref().map_or(ptr::null_mut(), |reason| unsafe {
         objc::begin_activity(reason.get())
     });
-    let stats = run_tap(gate, shared, ready);
+    let stats = run_tap(gate, shared, (timebase, realtime), ready);
     // SAFETY: 위에서 받은 토큰이고 한 번만 끝낸다.
     unsafe { objc::end_activity(activity) };
     stats
 }
 
+fn timebase() -> Timebase {
+    let mut timebase = ffi::MachTimebase::default();
+    // SAFETY: `timebase` 는 살아 있는 구조체이고 함수가 채운다. 실패하면 0 이 남아 틱으로 읽지 않는다.
+    unsafe { ffi::mach_timebase_info(&raw mut timebase) };
+    Timebase {
+        numer: timebase.numer,
+        denom: timebase.denom,
+    }
+}
+
+/// 지금 스레드를 실시간 스케줄링으로 바꾼다. 바꿨으면 참.
+fn make_realtime(timebase: Timebase) -> bool {
+    let (Some(computation), Some(constraint)) = (
+        timebase.ticks(RT_COMPUTATION_NS),
+        timebase.ticks(RT_CONSTRAINT_NS),
+    ) else {
+        return false;
+    };
+    let policy = ffi::TimeConstraint {
+        // 주기가 없는 일(키가 올 때만 깨어난다)이다.
+        period: 0,
+        computation,
+        constraint,
+        preemptible: 1,
+    };
+    // SAFETY: `mach_thread_self` 가 준 포트 이름으로 지금 스레드의 정책을 바꾸고, 그 이름을 놓는다.
+    // `policy` 는 호출 동안 살아 있고 개수는 그 구조체의 u32 칸 수다.
+    unsafe {
+        let thread = ffi::mach_thread_self();
+        let result = ffi::thread_policy_set(
+            thread,
+            ffi::THREAD_TIME_CONSTRAINT_POLICY,
+            &raw const policy,
+            ffi::THREAD_TIME_CONSTRAINT_POLICY_COUNT,
+        );
+        ffi::mach_port_deallocate(ffi::MACH_TASK_SELF, thread);
+        result == 0
+    }
+}
+
 fn run_tap(
     gate: PressGate,
     shared: Arc<Shared>,
+    (timebase, realtime): (Timebase, bool),
     ready: &mpsc::SyncSender<Option<Remote>>,
 ) -> TapStats {
     let marker = marker();
@@ -241,9 +297,6 @@ fn run_tap(
     // SAFETY: `pulse_source` 는 방금 만든 살아 있는 이벤트 소스다.
     unsafe { ffi::CGEventSourceSetUserData(pulse_source.get(), marker) };
     let epoch = shared.epoch.load(Ordering::Acquire);
-    let mut timebase = ffi::MachTimebase::default();
-    // SAFETY: `timebase` 는 살아 있는 구조체이고 함수가 채운다. 실패하면 0 이 남아 틱으로 읽지 않는다.
-    unsafe { ffi::mach_timebase_info(&raw mut timebase) };
     let state = Box::into_raw(Box::new(State {
         gate,
         marker,
@@ -253,10 +306,7 @@ fn run_tap(
         disabled: 0,
         shared,
         epoch,
-        timebase: Timebase {
-            numer: timebase.numer,
-            denom: timebase.denom,
-        },
+        timebase,
         pending: Lag::default(),
     }));
     // SAFETY: `callback` 의 시그니처는 CGEventTapCallBack 과 같고, `state` 는 탭보다 오래 산다.
@@ -294,6 +344,7 @@ fn run_tap(
         Remote {
             run_loop: ffi::CFRetain(run_loop),
             port: ffi::CFRetain(port.get()),
+            realtime,
         }
     };
     if ready.send(Some(remote)).is_ok() {
@@ -353,6 +404,7 @@ impl Tap {
             run_loop,
             port,
             thread: Some(thread),
+            realtime: remote.realtime,
         })
     }
 
@@ -362,6 +414,12 @@ impl Tap {
         self.shared.epoch.fetch_add(1, Ordering::Release);
         // SAFETY: `port` 는 우리가 retain 한 탭의 mach 포트다. 무효가 됐으면 아무 일도 없다.
         unsafe { ffi::CGEventTapEnable(self.port.get(), !paused) };
+    }
+
+    /// 탭 스레드가 실시간 우선순위로 도는지.
+    #[must_use]
+    pub const fn realtime(&self) -> bool {
+        self.realtime
     }
 
     /// 마지막으로 부른 뒤에 전환한 누름들의 대기 분포를 가져간다.

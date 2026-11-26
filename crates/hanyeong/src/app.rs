@@ -247,6 +247,11 @@ pub fn run(keys: Keys) -> bool {
         err!("hanyeong: 이벤트 탭을 만들지 못했습니다");
         return false;
     };
+    if !tap.realtime() {
+        err!(
+            "hanyeong: 탭 스레드를 실시간 우선순위로 올리지 못했습니다. 기기가 바쁘면 전환이 늦을 수 있습니다"
+        );
+    }
     let mut app = new_app(keys);
     if let Err(error) = hotkey::claim(keys.target.key_code()) {
         err!("hanyeong: {error}");
