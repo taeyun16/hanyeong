@@ -12,6 +12,7 @@ pub mod hid;
 pub mod hotkey;
 mod objc;
 pub mod probe;
+pub mod secure;
 pub mod session;
 pub mod tap;
 pub mod tray;
