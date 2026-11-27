@@ -7,8 +7,10 @@ use hanyeong_core::lag::{self, Lag};
 use hanyeong_core::mapping::{self, Change, Pair};
 use hanyeong_core::press::PressGate;
 use hanyeong_core::recheck::{IDLE_MS, Recheck};
+use hanyeong_core::secure::{Notice, SecureWatch};
 use hanyeong_mac::hid::{Keyboard, Keyboards, MAX_KEYBOARDS};
 use hanyeong_mac::hotkey::{self, Released};
+use hanyeong_mac::secure;
 use hanyeong_mac::session::{self, Events};
 use hanyeong_mac::tap::Tap;
 use hanyeong_mac::tray::Tray;
@@ -106,14 +108,42 @@ impl App {
     }
 }
 
+/// 보안 입력을 켠 프로세스를 `이름(번호)` 로 적는다.
+pub fn owner(pid: i64) -> String {
+    let mut text = String::new();
+    if pid <= 0 {
+        text.push_str("알 수 없는 프로세스");
+    } else if secure::push_process_name(pid, &mut text) {
+        text.push_str(&format!("({pid})"));
+    } else {
+        text.push_str(&format!("프로세스 {pid}"));
+    }
+    text
+}
+
 /// 탭이 붙어 도는 동안의 앱. 확인할 때마다 탭이 모은 대기 분포를 가져와, 늦은 누름이 있었으면 남긴다.
 struct Running<'a> {
     app: &'a mut App,
     tap: &'a Tap,
     lag: Lag,
+    secure: SecureWatch,
 }
 
 impl Running<'_> {
+    /// 보안 입력이 켜지거나 풀렸으면 남긴다. 켜진 동안에는 한영 키가 탭에 오지 않는다.
+    fn check_secure(&mut self) {
+        match self.secure.observe(secure::state()) {
+            Some(Notice::On { pid }) => err!(
+                "hanyeong: 보안 입력이 켜져 있습니다: {}. 그동안 한영 키는 hanyeong 에 닿지 않아 뗄 때 \
+                 시스템이 전환하고, 기기가 바쁘면 누름을 잃습니다. 그 앱의 암호 입력란을 벗어나거나 앱을 \
+                 다시 띄우면 풀립니다",
+                owner(pid)
+            ),
+            Some(Notice::Off) => out!("hanyeong: 보안 입력이 풀렸습니다"),
+            None => {}
+        }
+    }
+
     fn collect(&mut self) {
         let recent = self.tap.take_lag();
         if recent.slow() > 0 {
@@ -131,6 +161,7 @@ impl Running<'_> {
 impl Events for Running<'_> {
     fn recheck(&mut self) -> u32 {
         self.collect();
+        self.check_secure();
         self.app.apply_all();
         self.app.recheck.checked()
     }
@@ -272,7 +303,9 @@ pub fn run(keys: Keys) -> bool {
         app: &mut app,
         tap: &tap,
         lag: Lag::default(),
+        secure: SecureWatch::new(),
     };
+    running.check_secure();
     let ran = session::run(&mut running, IDLE_MS, tray.as_ref());
     let mut total = running.lag;
     drop(tray);

@@ -1,4 +1,4 @@
-//! macOS 프레임워크의 C 선언. 시그니처는 SDK 헤더(CoreFoundation, CoreGraphics, IOKit, HIServices)에서 옮겼다.
+//! macOS 프레임워크의 C 선언. 시그니처는 SDK 헤더(CoreFoundation, CoreGraphics, IOKit, HIServices, HIToolbox)에서 옮겼다.
 
 use core::ffi::{c_char, c_int, c_void};
 
@@ -226,6 +226,14 @@ unsafe extern "C" {
     /// 이 소스로 만든 이벤트에 붙는 사용자 데이터.
     pub fn CGEventSourceSetUserData(source: Ref, data: i64);
     pub fn CGEventPost(tap: u32, event: *mut c_void);
+    /// Copy 규칙으로 호출자가 소유한다. 로그인 세션이 없으면 null.
+    pub fn CGSessionCopyCurrentDictionary() -> Ref;
+}
+
+#[link(name = "Carbon", kind = "framework")]
+unsafe extern "C" {
+    /// 어느 프로세스든 보안 입력을 켜 두었으면 참.
+    pub fn IsSecureEventInputEnabled() -> Boolean;
 }
 
 #[link(name = "ApplicationServices", kind = "framework")]
@@ -296,4 +304,6 @@ unsafe extern "C" {
         count: u32,
     ) -> c_int;
     pub fn pthread_set_qos_class_self_np(class: u32, relative_priority: c_int) -> c_int;
+    /// 프로세스 이름을 `buffer` 에 쓰고 그 길이를 돌려준다. 없으면 0.
+    pub fn proc_name(pid: c_int, buffer: *mut c_void, size: u32) -> c_int;
 }

@@ -2,10 +2,13 @@
 
 use hanyeong_core::args::{Keys, Probe, ProbeMode};
 use hanyeong_core::mapping::Pair;
+use hanyeong_core::secure::Secure;
 use hanyeong_core::shortcut;
 use hanyeong_core::stats;
 use hanyeong_mac::hid::Keyboards;
-use hanyeong_mac::{hotkey, probe, trust};
+use hanyeong_mac::{hotkey, probe, secure, trust};
+
+use crate::app::owner;
 
 use crate::rivals;
 
@@ -19,6 +22,13 @@ pub fn status(keys: Keys) -> bool {
         "접근성 권한: {}",
         if trust::trusted() { "있음" } else { "없음" }
     );
+    match secure::state() {
+        Secure::Off => out!("보안 입력: 꺼짐"),
+        Secure::On { pid } => out!(
+            "보안 입력: 켜짐, {} (그동안 한영 키는 hanyeong 에 닿지 않고 시스템 단축키로 전환됩니다)",
+            owner(pid)
+        ),
+    }
     for name in ["hanyeong", "gksdud"] {
         out!("{name} 실행 중: {}", rivals::running(name));
     }
